@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # Copy source
 COPY . .
@@ -14,4 +14,5 @@ RUN mkdir -p /app/data
 
 EXPOSE 3000 3001
 
-CMD ["npm", "run", "dev"]
+# Start both services
+CMD ["sh", "-c", "node web/server.js & node bot/index.js"]
