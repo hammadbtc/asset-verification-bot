@@ -14,6 +14,7 @@ const client = new Client({
 
 // Configuration
 const VERIFIED_ROLE_ID = process.env.VERIFIED_ROLE_ID;
+const VERIFICATION_CHANNEL_ID = process.env.VERIFICATION_CHANNEL_ID;
 const WEB_BASE_URL = process.env.WEB_BASE_URL || 'http://localhost:3000';
 const BOT_API_PORT = process.env.BOT_PORT || 3001;
 
@@ -27,11 +28,16 @@ async function registerCommands() {
     const commands = [
         new SlashCommandBuilder()
             .setName('verify')
-            .setDescription('Verify your NFT ownership to get the verified role')
+            .setDescription('Get your personal verification link')
             .toJSON(),
         new SlashCommandBuilder()
             .setName('check')
             .setDescription('Check your verification status')
+            .toJSON(),
+        new SlashCommandBuilder()
+            .setName('setup')
+            .setDescription('Setup verification in this channel (Admin only)')
+            .setDefaultMemberPermissions('0')
             .toJSON(),
         new SlashCommandBuilder()
             .setName('admin')
@@ -53,7 +59,7 @@ async function registerCommands() {
                 sub.setName('reverify')
                     .setDescription('Run re-verification check on all users')
             )
-            .setDefaultMemberPermissions('0') // Admin only
+            .setDefaultMemberPermissions('0')
             .toJSON()
     ];
 
@@ -315,6 +321,64 @@ async function handleAdmin(interaction) {
     }
 }
 
+/**
+ * Handle /setup command - Post persistent verification message
+ */
+async function handleSetup(interaction) {
+    try {
+        // Create the persistent verification embed
+        const embed = new EmbedBuilder()
+            .setTitle('🥚 Ordinal Eggs Verification')
+            .setDescription(
+                '**🔒 Verify Holder Status**\n\n' +
+                'This community uses Ordinal Eggs Holder Verification!\n\n' +
+                '✅ To get access to the server, you must verify that you hold:\n' +
+                '• Ordinal Eggs (Sub10k)\n' +
+                '• Mother Cluckers\n\n' +
+                '👉 Click **"Verify Now"** below to connect your wallet and verify.\n\n' +
+                '🔐 Adding a wallet will not give anyone access to your wallet and will only be used to verify your holder status.'
+            )
+            .setColor(0x667eea)
+            .setThumbnail('https://ordinal-eggs.com/logo.jpg') // Update with your logo URL
+            .setFooter({ text: 'Powered by Ordinal Eggs • Secure Message Signing' });
+
+        // Create buttons
+        const row = new ActionRowBuilder()
+            .addComponents(
+                new ButtonBuilder()
+                    .setCustomId('verify_start')
+                    .setLabel('🔐 Verify Now')
+                    .setStyle(ButtonStyle.Primary),
+                new ButtonBuilder()
+                    .setCustomId('check_status')
+                    .setLabel('📊 Check Status')
+                    .setStyle(ButtonStyle.Secondary),
+                new ButtonBuilder()
+                    .setCustomId('manage_wallets')
+                    .setLabel('👛 My Wallets')
+                    .setStyle(ButtonStyle.Success)
+            );
+
+        // Send the persistent message
+        await interaction.channel.send({
+            embeds: [embed],
+            components: [row]
+        });
+
+        await interaction.reply({
+            content: '✅ Verification message posted! This channel is now the verification hub.',
+            ephemeral: true
+        });
+
+    } catch (err) {
+        console.error('Setup error:', err);
+        await interaction.reply({
+            content: '❌ Failed to setup verification message.',
+            ephemeral: true
+        });
+    }
+}
+
 // Event handlers
 client.on('clientReady', () => {
     console.log(`🤖 Bot logged in as ${client.user.tag}`);
@@ -325,6 +389,51 @@ client.on('clientReady', () => {
 });
 
 client.on('interactionCreate', async (interaction) => {
+    // Handle button clicks
+    if (interaction.isButton()) {
+        if (interaction.customId === 'verify_start') {
+            // Create ephemeral verification link
+            await handleVerifyButton(interaction);
+            return;
+        }
+        if (interaction.customId === 'check_status') {
+            await handleCheck(interaction);
+            return;
+        }
+        if (interaction.customId === 'manage_wallets') {
+            await handleManageWallets(interaction);
+            return;
+        }
+        if (interaction.customId.startsWith('check_')) {
+            const sessionId = interaction.customId.replace('check_', '');
+            try {
+                const response = await fetch(`${WEB_BASE_URL}/api/result/${sessionId}`);
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    await interaction.reply({
+                        content: result.success 
+                            ? '✅ Verification complete! Check above for your role.'
+                            : '⏳ Still waiting for verification...',
+                        ephemeral: true
+                    });
+                } else {
+                    await interaction.reply({
+                        content: '⏳ Verification in progress... Please complete the wallet connection.',
+                        ephemeral: true
+                    });
+                }
+            } catch (err) {
+                await interaction.reply({
+                    content: '❌ Error checking status. Please try again.',
+                    ephemeral: true
+                });
+            }
+            return;
+        }
+    }
+
+    // Handle slash commands
     if (interaction.isChatInputCommand()) {
         switch (interaction.commandName) {
             case 'verify':
@@ -333,40 +442,106 @@ client.on('interactionCreate', async (interaction) => {
             case 'check':
                 await handleCheck(interaction);
                 break;
+            case 'setup':
+                await handleSetup(interaction);
+                break;
             case 'admin':
                 await handleAdmin(interaction);
                 break;
         }
     }
-
-    if (interaction.isButton() && interaction.customId.startsWith('check_')) {
-        const sessionId = interaction.customId.replace('check_', '');
-        
-        try {
-            const response = await fetch(`${WEB_BASE_URL}/api/result/${sessionId}`);
-            
-            if (response.ok) {
-                const result = await response.json();
-                await interaction.reply({
-                    content: result.success 
-                        ? '✅ Verification complete! Check above for your role.'
-                        : '⏳ Still waiting for verification...',
-                    ephemeral: true
-                });
-            } else {
-                await interaction.reply({
-                    content: '⏳ Verification in progress... Please complete the wallet connection.',
-                    ephemeral: true
-                });
-            }
-        } catch (err) {
-            await interaction.reply({
-                content: '❌ Error checking status. Please try again.',
-                ephemeral: true
-            });
-        }
-    }
 });
+
+/**
+ * Handle Verify button click (from persistent message)
+ */
+async function handleVerifyButton(interaction) {
+    const userId = interaction.user.id;
+    const guildId = interaction.guildId;
+
+    try {
+        // Create verification session
+        const response = await fetch(`${WEB_BASE_URL}/api/session`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                userId,
+                guildId,
+                createdAt: Date.now()
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to create verification session');
+        }
+
+        const { sessionId, url } = await response.json();
+        const verifyUrl = `${WEB_BASE_URL}${url}`;
+
+        const embed = new EmbedBuilder()
+            .setTitle('🔐 Start Verification')
+            .setDescription(
+                'Click the button below to verify your NFT ownership.\n\n' +
+                '**Supported Wallets:**\n' +
+                '• Unisat\n' +
+                '• Xverse\n\n' +
+                '⚠️ This link expires in 10 minutes.'
+            )
+            .setColor(0x667eea);
+
+        const row = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setLabel('🔐 Verify Wallet')
+                .setStyle(ButtonStyle.Link)
+                .setURL(verifyUrl)
+        );
+
+        await interaction.reply({
+            embeds: [embed],
+            components: [row],
+            ephemeral: true
+        });
+
+    } catch (err) {
+        console.error('Verify button error:', err);
+        await interaction.reply({
+            content: '❌ Failed to start verification. Please try again.',
+            ephemeral: true
+        });
+    }
+}
+
+/**
+ * Handle Manage Wallets button
+ */
+async function handleManageWallets(interaction) {
+    const member = interaction.member;
+    const hasRole = VERIFIED_ROLE_ID && member.roles.cache.has(VERIFIED_ROLE_ID);
+
+    if (!hasRole) {
+        await interaction.reply({
+            content: '❌ You are not verified yet. Click "Verify Now" to verify your wallet.',
+            ephemeral: true
+        });
+        return;
+    }
+
+    // TODO: Load user's saved wallets from database
+    const embed = new EmbedBuilder()
+        .setTitle('👛 Your Connected Wallets')
+        .setDescription(
+            'You can add multiple wallets to aggregate your NFTs.\n\n' +
+            '**Currently verified wallets:**\n' +
+            '• (Wallets will be listed here from database)\n\n' +
+            'Use `/verify` to add another wallet.'
+        )
+        .setColor(0x4CAF50);
+
+    await interaction.reply({
+        embeds: [embed],
+        ephemeral: true
+    });
+}
 
 // Start bot
 client.login(process.env.DISCORD_TOKEN);
