@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFT Ownership Verifier</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+        }
+        .container {
+            background: rgba(255,255,255,0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 450px;
+            width: 90%;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        h1 { font-size: 1.8rem; margin-bottom: 10px; text-align: center; }
+        .subtitle { 
+            color: #888; 
+            text-align: center; 
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        .status {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+            min-height: 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .status-icon {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+        .wallet-info {
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            padding: 12px;
+            margin: 15px 0;
+            font-family: monospace;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: white;
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .nft-preview {
+            background: rgba(0,0,0,0.2);
+            border-radius: 12px;
+            padding: 15px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .nft-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .nft-item {
+            aspect-ratio: 1;
+            background: rgba(255,255,255,0.1);
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            color: #888;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none !important; }
+        .success { color: #4CAF50; }
+        .error { color: #f44336; }
+        .warning { color: #ff9800; }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.8rem;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 NFT Verifier</h1>
+        <p class="subtitle">Connect your wallet to verify NFT ownership</p>
+        
+        <div class="status" id="status">
+            <div class="status-icon">👛</div>
+            <div>Connect your wallet to begin</div>
+        </div>
+
+        <div id="wallet-section" class="hidden">
+            <div class="wallet-info" id="wallet-address"></div>
+        </div>
+
+        <div id="nft-section" class="hidden">
+            <div class="nft-preview">
+                <div>Your NFTs</div>
+                <div class="nft-grid" id="nft-grid"></div>
+            </div>
+        </div>
+
+        <button class="btn-primary" id="connect-btn" onclick="connectWallet()">
+            Connect Wallet
+        </button>
+        
+        <button class="btn-primary hidden" id="verify-btn" onclick="verifyOwnership()">
+            Sign & Verify
+        </button>
+        
+        <button class="btn-secondary hidden" id="disconnect-btn" onclick="disconnectWallet()">
+            Disconnect
+        </button>
+
+        <div class="footer">
+            Secure wallet signature verification • No private keys stored
+        </div>
+    </div>
+
+    <script>
+        // Get verification session from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('session');
+        const userId = urlParams.get('user');
+        const guildId = urlParams.get('guild');
+
+        let connectedWallet = null;
+        let userNFTs = [];
+
+        const statusEl = document.getElementById('status');
+        const connectBtn = document.getElementById('connect-btn');
+        const verifyBtn = document.getElementById('verify-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const walletSection = document.getElementById('wallet-section');
+        const walletAddressEl = document.getElementById('wallet-address');
+        const nftSection = document.getElementById('nft-section');
+        const nftGrid = document.getElementById('nft-grid');
+
+        // Check for session
+        if (!sessionId || !userId) {
+            statusEl.innerHTML = '<div class="status-icon">⚠️</div><div class="warning">Invalid verification link. Please use the link from Discord.</div>';
+            connectBtn.disabled = true;
+        }
+
+        function updateStatus(icon, message, type = '') {
+            statusEl.innerHTML = `<div class="status-icon">${icon}</div><div class="${type}">${message}</div>`;
+        }
+
+        async function connectWallet() {
+            updateStatus('⏳', 'Connecting...');
+            connectBtn.disabled = true;
+
+            try {
+                // 1. Try Unisat (most popular for Ordinals)
+                if (window.unisat) {
+                    const accounts = await window.unisat.requestAccounts();
+                    connectedWallet = {
+                        type: 'unisat',
+                        address: accounts[0]
+                    };
+                }
+                // 2. Try Xverse (window.bitcoin.xverse)
+                else if (window.bitcoin?.xverse) {
+                    const response = await window.bitcoin.xverse.connect();
+                    connectedWallet = {
+                        type: 'xverse',
+                        address: response.address
+                    };
+                }
+                // 3. Try Leather (StacksProvider)
+                else if (window.StacksProvider) {
+                    const response = await window.StacksProvider.authenticationRequest('verify');
+                    connectedWallet = {
+                        type: 'leather',
+                        address: response.address
+                    };
+                }
+                else {
+                    updateStatus('📱', 'Install Unisat, Xverse, or Leather wallet', 'warning');
+                    connectBtn.disabled = false;
+                    return;
+                }
+
+                // Update UI
+                walletAddressEl.textContent = connectedWallet.address;
+                walletSection.classList.remove('hidden');
+                connectBtn.classList.add('hidden');
+                verifyBtn.classList.remove('hidden');
+                disconnectBtn.classList.remove('hidden');
+                
+                updateStatus('✅', 'Wallet connected! Click "Sign & Verify" to continue.', 'success');
+                
+                // Fetch NFTs
+                await fetchNFTs();
+
+            } catch (err) {
+                console.error('Connection error:', err);
+                updateStatus('❌', 'Connection failed: ' + err.message, 'error');
+                connectBtn.disabled = false;
+            }
+        }
+
+        async function fetchNFTs() {
+            try {
+                const response = await fetch(`/api/nfts?address=${connectedWallet.address}`);
+                const data = await response.json();
+                userNFTs = data.nfts || [];
+                
+                if (userNFTs.length > 0) {
+                    nftSection.classList.remove('hidden');
+                    nftGrid.innerHTML = userNFTs.map(nft => `
+                        <div class="nft-item" title="${nft.name || 'NFT #' + nft.id}">
+                            ${nft.name ? nft.name.substring(0, 10) : '#' + nft.id}
+                        </div>
+                    `).join('');
+                }
+            } catch (err) {
+                console.error('Failed to fetch NFTs:', err);
+            }
+        }
+
+        async function verifyOwnership() {
+            updateStatus('⏳', 'Waiting for signature...');
+            verifyBtn.disabled = true;
+
+            try {
+                const message = `Verify NFT ownership for Discord user ${userId} at ${Date.now()}`;
+                let signature;
+
+                // Sign with appropriate wallet
+                if (connectedWallet.type === 'unisat') {
+                    signature = await window.unisat.signMessage(message, 'bip322-simple');
+                } else if (connectedWallet.type === 'xverse') {
+                    signature = await window.bitcoin.xverse.signMessage(message);
+                } else if (connectedWallet.type === 'leather') {
+                    const response = await window.StacksProvider.signMessage(message);
+                    signature = response.signature;
+                } else {
+                    throw new Error('Unknown wallet type');
+                }
+
+                // Send to verification API
+                const response = await fetch('/api/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sessionId,
+                        userId,
+                        guildId,
+                        address: connectedWallet.address,
+                        signature,
+                        message
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateStatus('🎉', 'Verification successful! You can close this window.', 'success');
+                    verifyBtn.classList.add('hidden');
+                } else {
+                    updateStatus('❌', result.error || 'Verification failed', 'error');
+                    verifyBtn.disabled = false;
+                }
+
+            } catch (err) {
+                console.error('Verification error:', err);
+                updateStatus('❌', 'Signature failed: ' + err.message, 'error');
+                verifyBtn.disabled = false;
+            }
+        }
+
+        function disconnectWallet() {
+            connectedWallet = null;
+            userNFTs = [];
+            walletSection.classList.add('hidden');
+            nftSection.classList.add('hidden');
+            connectBtn.classList.remove('hidden');
+            connectBtn.disabled = false;
+            verifyBtn.classList.add('hidden');
+            verifyBtn.disabled = false;
+            disconnectBtn.classList.add('hidden');
+            updateStatus('👛', 'Connect your wallet to begin');
+        }
+    </script>
+</body>
+</html>

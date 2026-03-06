@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - WEB_PORT=3000
+      - HIRO_API_KEY=${HIRO_API_KEY}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    command: npm run start:web
+
+  bot:
+    build: .
+    environment:
+      - NODE_ENV=production
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_GUILD_ID=${DISCORD_GUILD_ID}
+      - VERIFIED_ROLE_ID=${VERIFIED_ROLE_ID}
+      - WEB_BASE_URL=${WEB_BASE_URL}
+      - BOT_PORT=3001
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    command: npm run start:bot
+    depends_on:
+      - web
