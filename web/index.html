@@ -3,141 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ordinal Eggs Verification</title>
+    <title>Ordinal Eggs — Verification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --black: #000000;
+            --white: #ffffff;
+            --gray-400: #a3a3a3;
+            --gray-500: #737373;
+            --gray-600: #525252;
+            --gray-800: #262626;
+            --gray-900: #171717;
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--black);
+            color: var(--white);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            color: #e6edf3;
-            padding: 20px;
+            overflow-x: hidden;
+            line-height: 1.6;
         }
-        
-        .container {
-            background: rgba(22, 27, 34, 0.95);
-            backdrop-filter: blur(20px);
-            border-radius: 16px;
-            padding: 32px;
-            max-width: 420px;
+
+        /* Animated Background - Same as Ordinal Eggs */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
             width: 100%;
-            border: 1px solid rgba(48, 54, 61, 0.8);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
         }
-        
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.03) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255,255,255,0.02) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, rgba(255,255,255,0.01) 0%, transparent 30%),
+                        radial-gradient(circle at 70% 60%, rgba(147, 197, 253, 0.06) 0%, transparent 40%);
+            animation: bgMove 20s ease-in-out infinite;
+        }
+
+        @keyframes bgMove {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            25% { transform: translate(2%, 2%) rotate(1deg); }
+            50% { transform: translate(-1%, 3%) rotate(-1deg); }
+            75% { transform: translate(3%, -2%) rotate(0.5deg); }
+        }
+
+        /* Glass Card - Black brick style */
+        .container {
+            background: rgba(255,255,255,0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 480px;
+            width: 90%;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 0%, rgba(147, 197, 253, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+        }
+
+        /* Header */
         .header {
             text-align: center;
-            margin-bottom: 24px;
+            margin-bottom: 32px;
+            position: relative;
+            z-index: 1;
         }
-        
+
         .logo {
-            width: 64px;
-            height: 64px;
-            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            width: 56px;
+            height: 56px;
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+            border: 1px solid rgba(255,255,255,0.2);
             border-radius: 16px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 32px;
+            font-size: 28px;
             margin: 0 auto 16px;
-            box-shadow: 0 10px 30px rgba(249, 115, 22, 0.3);
+            position: relative;
         }
-        
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(135deg, rgba(147, 197, 253, 0.3) 0%, transparent 50%);
+            border-radius: 18px;
+            z-index: -1;
+            filter: blur(8px);
+        }
+
         h1 { 
+            font-family: 'Space Grotesk', sans-serif;
             font-size: 1.5rem; 
             font-weight: 700;
             margin-bottom: 4px;
             color: #fff;
+            letter-spacing: -0.02em;
         }
-        
+
         .subtitle {
-            color: #8b949e;
-            font-size: 0.9rem;
+            color: var(--gray-400);
+            font-size: 0.95rem;
+            font-weight: 400;
         }
-        
+
+        /* Status Card - Dark brick */
         .status-card {
-            background: rgba(13, 17, 23, 0.8);
-            border: 1px solid rgba(48, 54, 61, 0.6);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
             text-align: center;
+            position: relative;
+            z-index: 1;
         }
-        
+
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(147, 197, 253, 0.3), transparent);
+        }
+
         .status-icon {
-            font-size: 2.5rem;
+            font-size: 2rem;
             margin-bottom: 12px;
         }
-        
+
         .status-title {
+            font-family: 'Space Grotesk', sans-serif;
             font-weight: 600;
             font-size: 1.1rem;
             margin-bottom: 8px;
             color: #fff;
         }
-        
+
         .status-text {
-            color: #8b949e;
+            color: var(--gray-400);
             font-size: 0.9rem;
             line-height: 1.5;
         }
-        
+
+        /* Warning State */
+        .status-card.warning {
+            border-color: rgba(234, 179, 8, 0.3);
+            background: rgba(234, 179, 8, 0.05);
+        }
+
+        .status-card.warning::before {
+            background: linear-gradient(90deg, transparent, rgba(234, 179, 8, 0.4), transparent);
+        }
+
+        /* Success State */
+        .status-card.success {
+            border-color: rgba(34, 197, 94, 0.3);
+            background: rgba(34, 197, 94, 0.05);
+        }
+
+        .status-card.success::before {
+            background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.4), transparent);
+        }
+
+        /* Wallet Info */
         .wallet-info {
-            background: rgba(35, 197, 94, 0.1);
-            border: 1px solid rgba(35, 197, 94, 0.3);
-            border-radius: 10px;
-            padding: 16px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 20px;
             margin: 16px 0;
+            position: relative;
+            z-index: 1;
         }
-        
+
         .wallet-label {
-            font-size: 0.75rem;
+            font-size: 0.7rem;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
-            color: #8b949e;
+            letter-spacing: 1px;
+            color: var(--gray-500);
             margin-bottom: 8px;
+            font-weight: 600;
         }
-        
+
         .wallet-address {
             font-family: 'SF Mono', monospace;
             font-size: 0.85rem;
-            color: #7ee787;
+            color: #93c5fd;
             word-break: break-all;
         }
-        
-        .nft-grid {
-            display: grid;
-            gap: 8px;
-            margin-top: 12px;
+
+        .divider {
+            height: 1px;
+            background: rgba(255,255,255,0.08);
+            margin: 16px 0;
         }
-        
+
+        /* NFT Grid */
+        .nft-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
         .nft-item {
-            background: rgba(48, 54, 61, 0.5);
-            border-radius: 8px;
-            padding: 12px 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 10px;
+            padding: 14px 16px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            transition: all 0.2s ease;
         }
-        
+
+        .nft-item:hover {
+            background: rgba(255,255,255,0.05);
+            border-color: rgba(255,255,255,0.1);
+        }
+
         .nft-name {
             font-weight: 500;
             color: #fff;
+            font-size: 0.95rem;
         }
-        
+
         .nft-count {
-            background: rgba(35, 197, 94, 0.2);
-            color: #7ee787;
+            background: rgba(147, 197, 253, 0.15);
+            color: #93c5fd;
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.85rem;
             font-weight: 600;
+            border: 1px solid rgba(147, 197, 253, 0.2);
         }
-        
+
+        /* Buttons - Ordinal Eggs Style */
         button {
             width: 100%;
             padding: 14px 20px;
@@ -146,135 +284,173 @@
             font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s ease;
-            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            margin-bottom: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
+            font-family: 'Inter', sans-serif;
+            position: relative;
+            z-index: 1;
+            overflow: hidden;
         }
-        
+
         button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         .btn-primary {
-            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.3);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
         }
-        
+
         .btn-primary:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
         }
-        
+
         .btn-secondary {
-            background: rgba(48, 54, 61, 0.8);
-            color: #e6edf3;
-            border: 1px solid rgba(48, 54, 61, 1);
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.15);
         }
-        
+
         .btn-secondary:hover:not(:disabled) {
-            background: rgba(48, 54, 61, 1);
-            border-color: #8b949e;
+            background: rgba(255,255,255,0.12);
+            border-color: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
         }
-        
+
         .btn-success {
             background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
             color: white;
-            box-shadow: 0 4px 14px rgba(34, 197, 94, 0.3);
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
         }
-        
+
         .btn-success:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(34, 197, 94, 0.4);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(34, 197, 94, 0.4);
         }
-        
+
         .btn-warning {
             background: rgba(234, 179, 8, 0.1);
             color: #fbbf24;
             border: 1px solid rgba(234, 179, 8, 0.3);
         }
-        
-        .wallet-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+
+        .btn-warning:hover:not(:disabled) {
+            background: rgba(234, 179, 8, 0.15);
         }
-        
-        .wallet-option {
-            background: rgba(13, 17, 23, 0.8);
-            border: 1px solid rgba(48, 54, 61, 0.8);
-            padding: 16px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .wallet-option:hover {
-            background: rgba(48, 54, 61, 0.5);
-            border-color: #3b82f6;
-        }
-        
-        .wallet-icon {
-            font-size: 1.5rem;
-        }
-        
-        .wallet-name {
-            font-weight: 600;
-            color: #fff;
-        }
-        
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 0.75rem;
-            color: #6e7681;
-        }
-        
-        .hidden { display: none !important; }
-        .success { color: #7ee787; }
-        .error { color: #f85149; }
-        .warning { color: #fbbf24; }
-        
-        .divider {
-            height: 1px;
-            background: rgba(48, 54, 61, 0.6);
-            margin: 16px 0;
-        }
-        
+
+        /* Summary Box */
         .summary-box {
-            background: rgba(35, 197, 94, 0.1);
-            border: 1px solid rgba(35, 197, 94, 0.2);
-            border-radius: 10px;
-            padding: 16px;
+            background: rgba(0,0,0,0.4);
+            border: 1px solid rgba(34, 197, 94, 0.2);
+            border-radius: 12px;
+            padding: 20px;
             margin-bottom: 16px;
             text-align: center;
+            position: relative;
         }
-        
+
+        .summary-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(34, 197, 94, 0.4), transparent);
+        }
+
         .summary-count {
-            font-size: 2rem;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 2.5rem;
             font-weight: 700;
-            color: #7ee787;
+            color: #22c55e;
+            margin-bottom: 4px;
         }
-        
+
         .summary-label {
-            color: #8b949e;
+            color: var(--gray-400);
             font-size: 0.85rem;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 24px;
+            font-size: 0.75rem;
+            color: var(--gray-600);
+            position: relative;
+            z-index: 1;
+        }
+
+        .hidden { display: none !important; }
+
+        /* Floating elements decoration */
+        .floating-ring {
+            position: fixed;
+            border: 1px solid rgba(147, 197, 253, 0.1);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .floating-ring:nth-child(1) {
+            width: 600px;
+            height: 600px;
+            top: -200px;
+            right: -200px;
+            animation: float 20s ease-in-out infinite;
+        }
+
+        .floating-ring:nth-child(2) {
+            width: 400px;
+            height: 400px;
+            bottom: -100px;
+            left: -100px;
+            animation: float 25s ease-in-out infinite reverse;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            50% { transform: translate(30px, 30px) rotate(180deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .container {
+                padding: 24px;
+                margin: 16px;
+            }
+            
+            h1 {
+                font-size: 1.3rem;
+            }
+            
+            .summary-count {
+                font-size: 2rem;
+            }
         }
     </style>
 </head>
 <body>
+    <!-- Background Animation -->
+    <div class="bg-animation"></div>
+    
+    <!-- Decorative Rings -->
+    <div class="floating-ring"></div>
+    <div class="floating-ring"></div>
+
     <div class="container">
         <div class="header">
             <div class="logo">🥚</div>
             <h1>Ordinal Eggs</h1>
-            <p class="subtitle">Holder Verification</p>
+            <p class="subtitle">Verification Bot — Connect your wallet</p>
         </div>
         
         <div class="status-card" id="status-card">
@@ -330,15 +506,21 @@
         const walletInfo = document.getElementById('wallet-info');
 
         if (!sessionId || !userId) {
-            updateStatus('⚠️', 'Invalid Link', 'Please use the link from Discord.', 'error');
+            statusCard.className = 'status-card warning';
+            statusCard.innerHTML = `
+                <div class="status-icon">⚠️</div>
+                <div class="status-title">Invalid Link</div>
+                <div class="status-text">Please use the verification link from Discord.</div>
+            `;
             unisatBtn.disabled = true;
             xverseBtn.disabled = true;
         }
 
         function updateStatus(icon, title, text, type = '') {
+            statusCard.className = 'status-card ' + type;
             statusCard.innerHTML = `
-                <div class="status-icon ${type}">${icon}</div>
-                <div class="status-title ${type}">${title}</div>
+                <div class="status-icon">${icon}</div>
+                <div class="status-title">${title}</div>
                 <div class="status-text">${text}</div>
             `;
         }
