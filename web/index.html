@@ -189,13 +189,6 @@
             <div class="wallet-info" id="wallet-address"></div>
         </div>
 
-        <div id="nft-section" class="hidden">
-            <div class="nft-preview">
-                <div>Your NFTs</div>
-                <div class="nft-grid" id="nft-grid"></div>
-            </div>
-        </div>
-
         <!-- Wallet buttons shown directly -->
         <div id="wallet-buttons">
             <button class="btn-primary" id="unisat-btn" onclick="connectSpecificWallet('unisat')">
@@ -207,7 +200,7 @@
             </button>
         </div>
         
-        <button class="btn-primary hidden" id="verify-btn" onclick="verifyOwnership()">
+        <button class="btn-primary hidden" id="verify-btn">
             Sign & Verify
         </button>
         
@@ -227,8 +220,8 @@
         const userId = urlParams.get('user');
         const guildId = urlParams.get('guild');
 
-        let connectedWallets = [];  // Array of {type, address, signature}
-        let allNFTs = [];  // Aggregate from all wallets
+        let connectedWallets = [];  // Array of {type, address, signature, nfts}
+        let currentWallet = null;  // Wallet being connected (not yet signed)
 
         const statusEl = document.getElementById('status');
         const unisatBtn = document.getElementById('unisat-btn');
@@ -264,45 +257,38 @@
             updateStatus('⏳', `Connecting to ${walletType}...`);
             
             try {
-                let newWallet;
+                let address;
                 if (walletType === 'unisat' && window.unisat) {
                     const accounts = await window.unisat.requestAccounts();
-                    // Check if already connected
-                    if (connectedWallets.some(w => w.address === accounts[0])) {
-                        updateStatus('⚠️', 'This wallet is already connected', 'warning');
-                        return;
-                    }
-                    newWallet = { type: 'unisat', address: accounts[0] };
+                    address = accounts[0];
                 } else if (walletType === 'xverse' && window.bitcoin?.xverse) {
                     const response = await window.bitcoin.xverse.connect();
-                    if (connectedWallets.some(w => w.address === response.address)) {
-                        updateStatus('⚠️', 'This wallet is already connected', 'warning');
-                        return;
-                    }
-                    newWallet = { type: 'xverse', address: response.address };
+                    address = response.address;
                 } else {
                     throw new Error('Wallet not available');
                 }
 
-                // Add to connected wallets
-                connectedWallets.push(newWallet);
+                // Check if already connected
+                if (connectedWallets.some(w => w.address === address)) {
+                    updateStatus('⚠️', 'This wallet is already connected and signed', 'warning');
+                    return;
+                }
+
+                // Set as current wallet (not yet added to list)
+                currentWallet = { type: walletType, address: address };
                 
                 // Update UI
-                updateWalletList();
                 walletSection.classList.remove('hidden');
                 walletButtons.classList.add('hidden');
                 disconnectBtn.classList.remove('hidden');
                 
-                // Show "Add Another Wallet" button if we have wallets
-                showAddAnotherButton();
+                // Fetch NFTs for this wallet
+                updateStatus('⏳', 'Fetching your NFTs...');
+                const walletNFTs = await fetchNFTsForWallet(currentWallet);
+                currentWallet.nfts = walletNFTs;
                 
-                // Fetch NFTs for this wallet and add to total
-                const walletNFTs = await fetchNFTsForWallet(newWallet);
-                newWallet.nfts = walletNFTs;
-                allNFTs = [...allNFTs, ...walletNFTs];
-                
-                // Show totals
-                displayTotals();
+                // Show wallet info with Sign button
+                showCurrentWalletInfo();
 
             } catch (err) {
                 console.error('Connection error:', err);
@@ -310,153 +296,141 @@
             }
         }
 
-        function updateWalletList() {
-            const walletList = connectedWallets.map((w, i) => 
-                `<div class="wallet-item">${i+1}. ${w.type === 'unisat' ? '🔷' : '🟠'} ${w.address.slice(0, 8)}...${w.address.slice(-6)}</div>`
-            ).join('');
-            
-            walletAddressEl.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 8px;">Connected Wallets (${connectedWallets.length}):</div>
-                ${walletList}
-            `;
-        }
-
-        function showAddAnotherButton() {
-            // Add button to connect another wallet
-            if (!document.getElementById('add-wallet-btn')) {
-                const addBtn = document.createElement('button');
-                addBtn.id = 'add-wallet-btn';
-                addBtn.className = 'btn-secondary';
-                addBtn.textContent = '+ Add Another Wallet';
-                addBtn.onclick = showWalletButtons;
-                addBtn.style.marginTop = '10px';
-                walletSection.appendChild(addBtn);
-            }
-        }
-
-        function showWalletButtons() {
-            walletButtons.classList.remove('hidden');
-            // Remove add button temporarily
-            const addBtn = document.getElementById('add-wallet-btn');
-            if (addBtn) addBtn.style.display = 'none';
-        }
-
-        async function fetchNFTsForWallet(wallet) {
-            try {
-                const response = await fetch(`/api/nfts?address=${wallet.address}`);
-                const data = await response.json();
-                return data.nfts || [];
-            } catch (err) {
-                console.error('Failed to fetch NFTs:', err);
-                return [];
-            }
-        }
-
-        function displayTotals() {
-            // Filter by collection
-            const eggs = allNFTs.filter(nft => {
+        function showCurrentWalletInfo() {
+            const eggs = currentWallet.nfts.filter(nft => {
                 const num = parseInt(nft.number);
                 return num >= 1 && num <= 10000;
             });
             
-            const cluckers = allNFTs.filter(nft => {
+            const cluckers = currentWallet.nfts.filter(nft => {
                 return nft.contentType?.includes('html') || 
                        nft.name?.toLowerCase().includes('clucker');
             });
             
-            const totalValid = eggs.length + cluckers.length;
+            const totalFound = eggs.length + cluckers.length;
             
-            // Display counts
-            statusEl.innerHTML = `
-                <div class="status-icon">📊</div>
+            walletAddressEl.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 10px;">Connected Wallet:</div>
+                <div class="wallet-item">${currentWallet.type === 'unisat' ? '🔷' : '🟠'} ${currentWallet.address.slice(0, 12)}...${currentWallet.address.slice(-6)}</div>
+                <div style="margin-top: 15px; margin-bottom: 8px;">Found in this wallet:</div>
                 <div class="nft-counts">
                     <div>🥚 Ordinal Eggs: ${eggs.length}</div>
                     <div>🐔 Mother Cluckers: ${cluckers.length}</div>
-                    <div style="font-size: 0.9rem; opacity: 0.7; margin-top: 5px;">From ${connectedWallets.length} wallet(s)</div>
                 </div>
             `;
             
-            if (totalValid > 0) {
-                verifyBtn.classList.remove('hidden');
-                verifyBtn.textContent = `Sign & Verify (${totalValid} NFTs from ${connectedWallets.length} wallet${connectedWallets.length > 1 ? 's' : ''})`;
+            // Show Sign button (or Skip if no NFTs)
+            verifyBtn.classList.remove('hidden');
+            if (totalFound > 0) {
+                verifyBtn.textContent = `✍️ Sign with this wallet (${totalFound} NFTs)`;
+                verifyBtn.onclick = signCurrentWallet;
             } else {
-                updateStatus('❌', 'No Ordinal Eggs or Mother Cluckers found across all connected wallets', 'error');
+                verifyBtn.textContent = `Skip (no NFTs found)`;
+                verifyBtn.classList.add('btn-secondary');
+                verifyBtn.classList.remove('btn-primary');
+                verifyBtn.onclick = skipCurrentWallet;
             }
         }
 
-        async function fetchAndDisplayNFTs() {
-            try {
-                const response = await fetch(`/api/nfts?address=${connectedWallet.address}`);
-                const data = await response.json();
-                const allNfts = data.nfts || [];
-                
-                // Filter by collection
-                const eggs = allNfts.filter(nft => {
-                    const num = parseInt(nft.number);
-                    return num >= 1 && num <= 10000;
-                });
-                
-                // For cluckers, check by traits/content
-                const cluckers = allNfts.filter(nft => {
-                    return nft.contentType?.includes('html') || 
-                           nft.name?.toLowerCase().includes('clucker');
-                });
-                
-                const totalValid = eggs.length + cluckers.length;
-                
-                // Display counts
-                statusEl.innerHTML = `
-                    <div class="status-icon">📊</div>
-                    <div class="nft-counts">
-                        <div>🥚 Ordinal Eggs: ${eggs.length}</div>
-                        <div>🐔 Mother Cluckers: ${cluckers.length}</div>
-                    </div>
-                `;
-                
-                if (totalValid > 0) {
-                    verifyBtn.classList.remove('hidden');
-                    verifyBtn.textContent = `Verify via Signing Message (${totalValid} found)`;
-                } else {
-                    updateStatus('❌', 'No Ordinal Eggs or Mother Cluckers found in this wallet', 'error');
-                }
-
-            } catch (err) {
-                console.error('Failed to fetch NFTs:', err);
-                updateStatus('❌', 'Failed to load NFTs', 'error');
-            }
-        }
-
-        async function verifyOwnership() {
-            updateStatus('⏳', `Signing with ${connectedWallets.length} wallet(s)...`);
+        async function signCurrentWallet() {
+            updateStatus('⏳', 'Waiting for signature...');
             verifyBtn.disabled = true;
 
             try {
                 const timestamp = Date.now();
                 const message = `Verify NFT ownership for Discord user ${userId} at ${timestamp}`;
                 
-                // Sign with ALL connected wallets
-                const walletProofs = [];
-                
-                for (const wallet of connectedWallets) {
-                    let signature;
-                    
-                    if (wallet.type === 'unisat') {
-                        signature = await window.unisat.signMessage(message, 'bip322-simple');
-                    } else if (wallet.type === 'xverse') {
-                        signature = await window.bitcoin.xverse.signMessage(message);
-                    } else {
-                        throw new Error(`Unknown wallet type: ${wallet.type}`);
-                    }
-                    
-                    walletProofs.push({
-                        address: wallet.address,
-                        type: wallet.type,
-                        signature,
-                        nfts: wallet.nfts || []
-                    });
+                let signature;
+                if (currentWallet.type === 'unisat') {
+                    signature = await window.unisat.signMessage(message, 'bip322-simple');
+                } else if (currentWallet.type === 'xverse') {
+                    signature = await window.bitcoin.xverse.signMessage(message);
                 }
+                
+                // Save wallet with signature
+                currentWallet.signature = signature;
+                currentWallet.message = message;
+                connectedWallets.push(currentWallet);
+                
+                updateStatus('✅', `Wallet signed! Total: ${connectedWallets.length} wallet(s)`, 'success');
+                
+                // Show options to add more or finish
+                showPostSignOptions();
 
-                // Send ALL wallet proofs to verification API
+            } catch (err) {
+                console.error('Signing error:', err);
+                updateStatus('❌', 'Signing failed: ' + err.message, 'error');
+                verifyBtn.disabled = false;
+            }
+        }
+
+        function skipCurrentWallet() {
+            // Don't add to list, just reset
+            currentWallet = null;
+            updateStatus('⚠️', 'Wallet skipped (no qualifying NFTs)', 'warning');
+            showPostSignOptions();
+        }
+
+        function showPostSignOptions() {
+            // Hide sign button
+            verifyBtn.classList.add('hidden');
+            verifyBtn.disabled = false;
+            verifyBtn.classList.remove('btn-secondary');
+            verifyBtn.classList.add('btn-primary');
+            
+            // Show totals
+            const totalNFTs = connectedWallets.reduce((sum, w) => sum + (w.nfts?.length || 0), 0);
+            
+            // Create action buttons
+            const existingActions = document.getElementById('action-buttons');
+            if (existingActions) existingActions.remove();
+            
+            const actionDiv = document.createElement('div');
+            actionDiv.id = 'action-buttons';
+            actionDiv.style.marginTop = '15px';
+            actionDiv.innerHTML = `
+                <div style="margin-bottom: 15px; padding: 12px; background: rgba(76,175,80,0.1); border-radius: 8px;">
+                    <strong>✅ ${connectedWallets.length} wallet(s) verified</strong><br>
+                    <span style="font-size: 0.9rem; opacity: 0.8;">${totalNFTs} total NFTs found</span>
+                </div>
+                <button class="btn-secondary" id="add-another-btn" style="width: 100%; margin-bottom: 10px;">
+                    + Add Another Wallet
+                </button>
+                ${connectedWallets.length > 0 ? `
+                <button class="btn-primary" id="complete-verify-btn" style="width: 100%;">
+                    ✅ Complete Verification
+                </button>` : ''}
+            `;
+            
+            walletSection.appendChild(actionDiv);
+            
+            document.getElementById('add-another-btn').onclick = () => {
+                actionDiv.remove();
+                walletButtons.classList.remove('hidden');
+                updateStatus('👛', 'Connect another wallet');
+            };
+            
+            const completeBtn = document.getElementById('complete-verify-btn');
+            if (completeBtn) {
+                completeBtn.onclick = submitAllWallets;
+            }
+        }
+
+        async function submitAllWallets() {
+            updateStatus('⏳', 'Submitting verification...');
+            
+            try {
+                // Send ALL signed wallets to server
+                const walletProofs = connectedWallets.map(w => ({
+                    address: w.address,
+                    type: w.type,
+                    signature: w.signature,
+                    nfts: w.nfts || []
+                }));
+                
+                // Use first wallet's message (same for all)
+                const message = connectedWallets[0]?.message || `Verify NFT ownership for Discord user ${userId}`;
+
                 const response = await fetch('/api/verify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -473,30 +447,42 @@
 
                 if (result.success) {
                     updateStatus('🎉', 'Verification successful! You can close this window.', 'success');
-                    verifyBtn.classList.add('hidden');
+                    const actionDiv = document.getElementById('action-buttons');
+                    if (actionDiv) actionDiv.innerHTML = '';
                 } else {
                     updateStatus('❌', result.error || 'Verification failed', 'error');
-                    verifyBtn.disabled = false;
                 }
 
             } catch (err) {
                 console.error('Verification error:', err);
-                updateStatus('❌', 'Signature failed: ' + err.message, 'error');
-                verifyBtn.disabled = false;
+                updateStatus('❌', 'Submission failed: ' + err.message, 'error');
+            }
+        }
+
+        async function fetchNFTsForWallet(wallet) {
+            try {
+                const response = await fetch(`/api/nfts?address=${wallet.address}`);
+                const data = await response.json();
+                return data.nfts || [];
+            } catch (err) {
+                console.error('Failed to fetch NFTs:', err);
+                return [];
             }
         }
 
         function disconnectWallet() {
             connectedWallets = [];
-            allNFTs = [];
+            currentWallet = null;
             walletSection.classList.add('hidden');
             walletButtons.classList.remove('hidden');
             verifyBtn.classList.add('hidden');
             verifyBtn.disabled = false;
+            verifyBtn.classList.remove('btn-secondary');
+            verifyBtn.classList.add('btn-primary');
             disconnectBtn.classList.add('hidden');
-            // Remove add button
-            const addBtn = document.getElementById('add-wallet-btn');
-            if (addBtn) addBtn.remove();
+            // Remove action buttons
+            const actionDiv = document.getElementById('action-buttons');
+            if (actionDiv) actionDiv.remove();
             updateStatus('👛', 'Choose your wallet');
         }
     </script>
