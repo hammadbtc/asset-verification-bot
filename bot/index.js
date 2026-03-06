@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle } from 'discord.js';
+import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -76,7 +76,7 @@ async function handleVerify(interaction) {
     const userId = interaction.user.id;
     const guildId = interaction.guildId;
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
         // Create verification session via web API
@@ -279,7 +279,7 @@ async function handleAdmin(interaction) {
 }
 
 // Event handlers
-client.on('ready', () => {
+client.on('clientReady', () => {
     console.log(`🤖 Bot logged in as ${client.user.tag}`);
     registerCommands();
 });
