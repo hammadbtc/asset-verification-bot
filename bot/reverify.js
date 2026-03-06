@@ -38,6 +38,21 @@ export async function saveVerifiedUser(userId, guildId, address, nfts) {
 }
 
 /**
+ * Get saved wallets for a user
+ */
+export function getUserWallets(userId, guildId) {
+    const key = `${guildId}:${userId}`;
+    const data = verifiedUsers.get(key);
+    if (!data) return [];
+    
+    return [{
+        address: data.address,
+        nfts: data.nfts,
+        verifiedAt: data.verifiedAt
+    }];
+}
+
+/**
  * Check if user still holds required NFTs
  */
 export async function checkUserHoldings(address, guildId) {

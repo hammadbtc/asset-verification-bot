@@ -1,6 +1,6 @@
 import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import dotenv from 'dotenv';
-import { runReverification, startReverificationScheduler, saveVerifiedUser } from './reverify.js';
+import { runReverification, startReverificationScheduler, saveVerifiedUser, getUserWallets } from './reverify.js';
 
 dotenv.config();
 
@@ -331,15 +331,14 @@ async function handleSetup(interaction) {
             .setTitle('🥚 Ordinal Eggs Verification')
             .setDescription(
                 '**🔒 Verify Holder Status**\n\n' +
-                'This community uses Ordinal Eggs Holder Verification!\n\n' +
-                '✅ To get access to the server, you must verify that you hold:\n' +
+                '✅ To access this server, verify ownership of:\n' +
                 '• Ordinal Eggs (Sub10k)\n' +
                 '• Mother Cluckers\n\n' +
-                '👉 Click **"Verify Now"** below to connect your wallet and verify.\n\n' +
-                '🔐 Adding a wallet will not give anyone access to your wallet and will only be used to verify your holder status.'
+                '👉 Click **"Verify Now"** to connect your wallet and get verified.\n\n' +
+                '🔐 Your wallet stays in your control. We only verify you hold the NFTs — no transactions, no permissions, just a message signature.'
             )
             .setColor(0x667eea)
-            .setThumbnail('https://ordinal-eggs.com/logo.jpg') // Update with your logo URL
+            .setThumbnail('https://ordinal-eggs.com/logo.jpg')
             .setFooter({ text: 'Powered by Ordinal Eggs • Secure Message Signing' });
 
         // Create buttons
@@ -526,16 +525,30 @@ async function handleManageWallets(interaction) {
         return;
     }
 
-    // TODO: Load user's saved wallets from database
+    // Get user's saved wallets
+    const wallets = getUserWallets(interaction.user.id, interaction.guildId);
+    
+    let walletList = '';
+    if (wallets.length > 0) {
+        walletList = wallets.map((w, i) => {
+            const shortAddr = `${w.address.slice(0, 8)}...${w.address.slice(-6)}`;
+            const nftCount = w.nfts?.length || 0;
+            const date = new Date(w.verifiedAt).toLocaleDateString();
+            return `${i + 1}. \`${shortAddr}\` — ${nftCount} NFTs (added ${date})`;
+        }).join('\n');
+    } else {
+        walletList = 'No wallets found in database.';
+    }
+
     const embed = new EmbedBuilder()
         .setTitle('👛 Your Connected Wallets')
         .setDescription(
             'You can add multiple wallets to aggregate your NFTs.\n\n' +
             '**Currently verified wallets:**\n' +
-            '• (Wallets will be listed here from database)\n\n' +
-            'Use `/verify` to add another wallet.'
+            walletList
         )
-        .setColor(0x4CAF50);
+        .setColor(0x4CAF50)
+        .setFooter({ text: 'Use /verify to add another wallet' });
 
     await interaction.reply({
         embeds: [embed],
