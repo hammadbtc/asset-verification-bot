@@ -281,47 +281,6 @@
                 updateStatus('❌', 'Connection failed: ' + err.message, 'error');
             }
         }
-            const walletList = wallets.map(w => 
-                `<button class="wallet-option" onclick="connectSpecificWallet('${w.id}')">${w.icon} ${w.name}</button>`
-            ).join('');
-            
-            statusEl.innerHTML = `
-                <div class="status-icon">👛</div>
-                <div>Choose your wallet:</div>
-                <div class="wallet-list">${walletList}</div>
-            `;
-            connectBtn.classList.add('hidden');
-        }
-
-        async function connectSpecificWallet(walletType) {
-            updateStatus('⏳', `Connecting to ${walletType}...`);
-            
-            try {
-                if (walletType === 'unisat') {
-                    const accounts = await window.unisat.requestAccounts();
-                    connectedWallet = { type: 'unisat', address: accounts[0] };
-                } else if (walletType === 'xverse') {
-                    const response = await window.bitcoin.xverse.connect();
-                    connectedWallet = { type: 'xverse', address: response.address };
-                } else if (walletType === 'leather') {
-                    const response = await window.StacksProvider.authenticationRequest('verify');
-                    connectedWallet = { type: 'leather', address: response.address };
-                }
-
-                walletAddressEl.textContent = connectedWallet.address;
-                walletSection.classList.remove('hidden');
-                connectBtn.classList.add('hidden');
-                disconnectBtn.classList.remove('hidden');
-                
-                // Fetch and categorize NFTs
-                await fetchAndDisplayNFTs();
-
-            } catch (err) {
-                console.error('Connection error:', err);
-                updateStatus('❌', 'Connection failed: ' + err.message, 'error');
-                connectBtn.classList.remove('hidden');
-            }
-        }
 
         async function fetchAndDisplayNFTs() {
             try {
