@@ -81,10 +81,10 @@ app.get('/api/nfts', async (req, res) => {
 });
 
 /**
- * Verify wallet signature and check NFT ownership
+ * Verify wallet signatures and check NFT ownership (multi-wallet)
  */
 app.post('/api/verify', async (req, res) => {
-    const { sessionId, userId, guildId, address, signature, message } = req.body;
+    const { sessionId, userId, guildId, wallets, message } = req.body;
 
     const session = sessions.get(sessionId);
     if (!session) {
@@ -92,20 +92,28 @@ app.post('/api/verify', async (req, res) => {
     }
 
     try {
-        // 1. Verify signature
-        const isValidSignature = await verifySignature(address, message, signature);
-        if (!isValidSignature) {
-            return res.json({ success: false, error: 'Invalid signature' });
+        // Verify ALL wallet signatures
+        for (const wallet of wallets) {
+            const isValidSignature = await verifySignature(wallet.address, message, wallet.signature);
+            if (!isValidSignature) {
+                return res.json({ 
+                    success: false, 
+                    error: `Invalid signature for wallet ${wallet.address.slice(0, 10)}...` 
+                });
+            }
         }
 
-        // 2. Fetch NFTs from Hiro API
-        const allNfts = await fetchOrdinals(address);
+        // Aggregate NFTs from ALL wallets
+        let allNfts = [];
+        for (const wallet of wallets) {
+            allNfts = [...allNfts, ...(wallet.nfts || [])];
+        }
         
-        // 3. Filter by collection for this guild
+        // Filter by collection for this guild
         const collectionId = getGuildCollection(guildId);
         const nfts = filterNFTsByCollection(allNfts, collectionId);
         
-        console.log(`📊 Address ${address.slice(0, 10)}... has ${allNfts.length} total NFTs, ${nfts.length} match collection ${collectionId}`);
+        console.log(`📊 User ${userId}: ${allNfts.length} total NFTs from ${wallets.length} wallets, ${nfts.length} match collection ${collectionId}`);
         
         // 4. Check if owns required NFT
         const collection = getCollection(collectionId);
@@ -118,7 +126,7 @@ app.post('/api/verify', async (req, res) => {
         if (nftsToUse.length < minRequired) {
             return res.json({ 
                 success: false, 
-                error: `No qualifying NFTs found. You have ${allNfts.length} ordinals but none match the ${collection?.name} criteria.`
+                error: `No qualifying NFTs found. You have ${allNfts.length} ordinals across ${wallets.length} wallet(s) but none match the ${collection?.name} criteria.`
             });
         }
 
@@ -127,9 +135,10 @@ app.post('/api/verify', async (req, res) => {
             success: true,
             userId,
             guildId,
-            address,
+            wallets: wallets.map(w => ({ address: w.address, type: w.type })),
             nfts: nftsToUse.slice(0, 10),
             collection: collection?.name || 'Any Ordinal',
+            walletCount: wallets.length,
             verifiedAt: Date.now()
         };
         

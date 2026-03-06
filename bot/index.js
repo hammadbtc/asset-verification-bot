@@ -195,23 +195,28 @@ async function grantVerifiedRole(interaction, result) {
             await member.roles.add(VERIFIED_ROLE_ID);
         }
         
-        // Save to re-verification tracking
-        await saveVerifiedUser(
-            result.userId,
-            result.guildId,
-            result.address,
-            result.nfts
-        );
+        // Save to re-verification tracking (all wallets)
+        for (const wallet of result.wallets || [{ address: result.address, type: 'unknown' }]) {
+            await saveVerifiedUser(
+                result.userId,
+                result.guildId,
+                wallet.address,
+                result.nfts || []
+            );
+        }
 
         const nftList = result.nfts.slice(0, 5).map(nft => 
             `• ${nft.name || 'NFT #' + nft.number}`
         ).join('\n');
 
+        const walletCount = result.walletCount || 1;
+        const walletText = walletCount > 1 ? `(${walletCount} wallets)` : '';
+
         const embed = new EmbedBuilder()
             .setTitle('✅ Verification Successful!')
             .setDescription(
-                `Welcome, ${member.user.username}!\n\n` +
-                `**Wallet:** \`${result.address.slice(0, 10)}...${result.address.slice(-6)}\`\n\n` +
+                `Welcome, ${member.user.username}! ${walletText}\n\n` +
+                `**Wallet(s):** ${result.wallets ? result.wallets.map(w => `\`${w.address.slice(0, 10)}...${w.address.slice(-6)}\``).join(', ') : `\`${result.address.slice(0, 10)}...${result.address.slice(-6)}\``}\n\n` +
                 `**Your NFTs:**\n${nftList}${result.nfts.length > 5 ? '\n• ...and more' : ''}`
             )
             .setColor(0x4CAF50)
