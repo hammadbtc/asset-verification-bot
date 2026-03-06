@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFT Ownership Verifier</title>
+    <title>Ordinal Eggs Verification Bot</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -168,12 +168,12 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔐 NFT Verifier</h1>
-        <p class="subtitle">Connect your wallet to verify NFT ownership</p>
+        <h1>🥚 Ordinal Eggs</h1>
+        <p class="subtitle">Verification Bot - Connect your wallet</p>
         
         <div class="status" id="status">
             <div class="status-icon">👛</div>
-            <div>Connect your wallet to begin</div>
+            <div>Choose your wallet</div>
         </div>
 
         <div id="wallet-section" class="hidden">
@@ -187,9 +187,16 @@
             </div>
         </div>
 
-        <button class="btn-primary" id="connect-btn" onclick="connectWallet()">
-            Connect Wallet
-        </button>
+        <!-- Wallet buttons shown directly -->
+        <div id="wallet-buttons">
+            <button class="btn-primary" id="unisat-btn" onclick="connectSpecificWallet('unisat')">
+                🔷 Connect Unisat
+            </button>
+            
+            <button class="btn-secondary" id="xverse-btn" onclick="connectSpecificWallet('xverse')">
+                🟠 Connect Xverse
+            </button>
+        </div>
         
         <button class="btn-primary hidden" id="verify-btn" onclick="verifyOwnership()">
             Sign & Verify
@@ -200,7 +207,7 @@
         </button>
 
         <div class="footer">
-            Secure wallet signature verification • No private keys stored
+            Secure message signing • No private keys stored
         </div>
     </div>
 
@@ -215,46 +222,65 @@
         let userNFTs = [];
 
         const statusEl = document.getElementById('status');
-        const connectBtn = document.getElementById('connect-btn');
+        const unisatBtn = document.getElementById('unisat-btn');
+        const xverseBtn = document.getElementById('xverse-btn');
         const verifyBtn = document.getElementById('verify-btn');
         const disconnectBtn = document.getElementById('disconnect-btn');
+        const walletButtons = document.getElementById('wallet-buttons');
         const walletSection = document.getElementById('wallet-section');
         const walletAddressEl = document.getElementById('wallet-address');
-        const nftSection = document.getElementById('nft-section');
-        const nftGrid = document.getElementById('nft-grid');
 
         // Check for session
         if (!sessionId || !userId) {
             statusEl.innerHTML = '<div class="status-icon">⚠️</div><div class="warning">Invalid verification link. Please use the link from Discord.</div>';
-            connectBtn.disabled = true;
+            unisatBtn.disabled = true;
+            xverseBtn.disabled = true;
+        }
+
+        // Check wallet availability on load
+        if (!window.unisat) {
+            unisatBtn.disabled = true;
+            unisatBtn.textContent = '🔷 Unisat (not installed)';
+            unisatBtn.style.opacity = '0.5';
+        }
+        
+        if (!window.bitcoin?.xverse) {
+            xverseBtn.disabled = true;
+            xverseBtn.textContent = '🟠 Xverse (not installed)';
+            xverseBtn.style.opacity = '0.5';
         }
 
         function updateStatus(icon, message, type = '') {
             statusEl.innerHTML = `<div class="status-icon">${icon}</div><div class="${type}">${message}</div>`;
         }
 
-        // Available wallets
-        const wallets = [];
-        if (window.unisat) wallets.push({ id: 'unisat', name: 'Unisat', icon: '🔷' });
-        if (window.bitcoin?.xverse) wallets.push({ id: 'xverse', name: 'Xverse', icon: '🟠' });
-        if (window.StacksProvider) wallets.push({ id: 'leather', name: 'Leather', icon: '🟣' });
+        async function connectSpecificWallet(walletType) {
+            updateStatus('⏳', `Connecting to ${walletType}...`);
+            
+            try {
+                if (walletType === 'unisat' && window.unisat) {
+                    const accounts = await window.unisat.requestAccounts();
+                    connectedWallet = { type: 'unisat', address: accounts[0] };
+                } else if (walletType === 'xverse' && window.bitcoin?.xverse) {
+                    const response = await window.bitcoin.xverse.connect();
+                    connectedWallet = { type: 'xverse', address: response.address };
+                } else {
+                    throw new Error('Wallet not available');
+                }
 
-        async function connectWallet() {
-            // Show wallet picker if multiple options
-            if (wallets.length > 1) {
-                showWalletPicker();
-                return;
+                walletAddressEl.textContent = connectedWallet.address;
+                walletSection.classList.remove('hidden');
+                walletButtons.classList.add('hidden');
+                disconnectBtn.classList.remove('hidden');
+                
+                // Fetch and categorize NFTs
+                await fetchAndDisplayNFTs();
+
+            } catch (err) {
+                console.error('Connection error:', err);
+                updateStatus('❌', 'Connection failed: ' + err.message, 'error');
             }
-            
-            if (wallets.length === 1) {
-                await connectSpecificWallet(wallets[0].id);
-                return;
-            }
-            
-            updateStatus('📱', 'Install Unisat, Xverse, or Leather wallet', 'warning');
         }
-
-        function showWalletPicker() {
             const walletList = wallets.map(w => 
                 `<button class="wallet-option" onclick="connectSpecificWallet('${w.id}')">${w.icon} ${w.name}</button>`
             ).join('');
@@ -394,13 +420,11 @@
             connectedWallet = null;
             userNFTs = [];
             walletSection.classList.add('hidden');
-            nftSection.classList.add('hidden');
-            connectBtn.classList.remove('hidden');
-            connectBtn.disabled = false;
+            walletButtons.classList.remove('hidden');
             verifyBtn.classList.add('hidden');
             verifyBtn.disabled = false;
             disconnectBtn.classList.add('hidden');
-            updateStatus('👛', 'Connect your wallet to begin');
+            updateStatus('👛', 'Choose your wallet');
         }
     </script>
 </body>
