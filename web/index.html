@@ -123,6 +123,41 @@
         .success { color: #4CAF50; }
         .error { color: #f44336; }
         .warning { color: #ff9800; }
+        
+        .wallet-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .wallet-option {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 1rem;
+        }
+        
+        .wallet-option:hover {
+            background: rgba(255,255,255,0.2);
+            border-color: rgba(255,255,255,0.4);
+        }
+        
+        .nft-counts {
+            margin-top: 10px;
+            font-size: 1.1rem;
+        }
+        
+        .nft-counts div {
+            margin: 5px 0;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+
         .footer {
             text-align: center;
             margin-top: 20px;
@@ -198,76 +233,109 @@
             statusEl.innerHTML = `<div class="status-icon">${icon}</div><div class="${type}">${message}</div>`;
         }
 
+        // Available wallets
+        const wallets = [];
+        if (window.unisat) wallets.push({ id: 'unisat', name: 'Unisat', icon: '🔷' });
+        if (window.bitcoin?.xverse) wallets.push({ id: 'xverse', name: 'Xverse', icon: '🟠' });
+        if (window.StacksProvider) wallets.push({ id: 'leather', name: 'Leather', icon: '🟣' });
+
         async function connectWallet() {
-            updateStatus('⏳', 'Connecting...');
-            connectBtn.disabled = true;
+            // Show wallet picker if multiple options
+            if (wallets.length > 1) {
+                showWalletPicker();
+                return;
+            }
+            
+            if (wallets.length === 1) {
+                await connectSpecificWallet(wallets[0].id);
+                return;
+            }
+            
+            updateStatus('📱', 'Install Unisat, Xverse, or Leather wallet', 'warning');
+        }
 
+        function showWalletPicker() {
+            const walletList = wallets.map(w => 
+                `<button class="wallet-option" onclick="connectSpecificWallet('${w.id}')">${w.icon} ${w.name}</button>`
+            ).join('');
+            
+            statusEl.innerHTML = `
+                <div class="status-icon">👛</div>
+                <div>Choose your wallet:</div>
+                <div class="wallet-list">${walletList}</div>
+            `;
+            connectBtn.classList.add('hidden');
+        }
+
+        async function connectSpecificWallet(walletType) {
+            updateStatus('⏳', `Connecting to ${walletType}...`);
+            
             try {
-                // 1. Try Unisat (most popular for Ordinals)
-                if (window.unisat) {
+                if (walletType === 'unisat') {
                     const accounts = await window.unisat.requestAccounts();
-                    connectedWallet = {
-                        type: 'unisat',
-                        address: accounts[0]
-                    };
-                }
-                // 2. Try Xverse (window.bitcoin.xverse)
-                else if (window.bitcoin?.xverse) {
+                    connectedWallet = { type: 'unisat', address: accounts[0] };
+                } else if (walletType === 'xverse') {
                     const response = await window.bitcoin.xverse.connect();
-                    connectedWallet = {
-                        type: 'xverse',
-                        address: response.address
-                    };
-                }
-                // 3. Try Leather (StacksProvider)
-                else if (window.StacksProvider) {
+                    connectedWallet = { type: 'xverse', address: response.address };
+                } else if (walletType === 'leather') {
                     const response = await window.StacksProvider.authenticationRequest('verify');
-                    connectedWallet = {
-                        type: 'leather',
-                        address: response.address
-                    };
-                }
-                else {
-                    updateStatus('📱', 'Install Unisat, Xverse, or Leather wallet', 'warning');
-                    connectBtn.disabled = false;
-                    return;
+                    connectedWallet = { type: 'leather', address: response.address };
                 }
 
-                // Update UI
                 walletAddressEl.textContent = connectedWallet.address;
                 walletSection.classList.remove('hidden');
                 connectBtn.classList.add('hidden');
-                verifyBtn.classList.remove('hidden');
                 disconnectBtn.classList.remove('hidden');
                 
-                updateStatus('✅', 'Wallet connected! Click "Sign & Verify" to continue.', 'success');
-                
-                // Fetch NFTs
-                await fetchNFTs();
+                // Fetch and categorize NFTs
+                await fetchAndDisplayNFTs();
 
             } catch (err) {
                 console.error('Connection error:', err);
                 updateStatus('❌', 'Connection failed: ' + err.message, 'error');
-                connectBtn.disabled = false;
+                connectBtn.classList.remove('hidden');
             }
         }
 
-        async function fetchNFTs() {
+        async function fetchAndDisplayNFTs() {
             try {
                 const response = await fetch(`/api/nfts?address=${connectedWallet.address}`);
                 const data = await response.json();
-                userNFTs = data.nfts || [];
+                const allNfts = data.nfts || [];
                 
-                if (userNFTs.length > 0) {
-                    nftSection.classList.remove('hidden');
-                    nftGrid.innerHTML = userNFTs.map(nft => `
-                        <div class="nft-item" title="${nft.name || 'NFT #' + nft.id}">
-                            ${nft.name ? nft.name.substring(0, 10) : '#' + nft.id}
-                        </div>
-                    `).join('');
+                // Filter by collection
+                const eggs = allNfts.filter(nft => {
+                    const num = parseInt(nft.number);
+                    return num >= 1 && num <= 10000;
+                });
+                
+                // For cluckers, check by traits/content
+                const cluckers = allNfts.filter(nft => {
+                    return nft.contentType?.includes('html') || 
+                           nft.name?.toLowerCase().includes('clucker');
+                });
+                
+                const totalValid = eggs.length + cluckers.length;
+                
+                // Display counts
+                statusEl.innerHTML = `
+                    <div class="status-icon">📊</div>
+                    <div class="nft-counts">
+                        <div>🥚 Ordinal Eggs: ${eggs.length}</div>
+                        <div>🐔 Mother Cluckers: ${cluckers.length}</div>
+                    </div>
+                `;
+                
+                if (totalValid > 0) {
+                    verifyBtn.classList.remove('hidden');
+                    verifyBtn.textContent = `Verify via Signing Message (${totalValid} found)`;
+                } else {
+                    updateStatus('❌', 'No Ordinal Eggs or Mother Cluckers found in this wallet', 'error');
                 }
+
             } catch (err) {
                 console.error('Failed to fetch NFTs:', err);
+                updateStatus('❌', 'Failed to load NFTs', 'error');
             }
         }
 
