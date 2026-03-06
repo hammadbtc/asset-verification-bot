@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { verifySignature, fetchOrdinals } from '../shared/verify.js';
+import { filterNFTsByCollection, getGuildCollection } from '../shared/collections.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -93,25 +94,31 @@ app.post('/api/verify', async (req, res) => {
         }
 
         // 2. Fetch NFTs from Hiro API
-        const nfts = await fetchOrdinals(address);
+        const allNfts = await fetchOrdinals(address);
         
-        // 3. Check if owns required NFT
-        const hasRequiredNFT = nfts.length > 0; // Customize as needed
+        // 3. Filter by collection for this guild
+        const collectionId = getGuildCollection(guildId);
+        const nfts = filterNFTsByCollection(allNfts, collectionId);
         
-        if (!hasRequiredNFT) {
+        // 4. Check if owns required NFT
+        const collection = getCollection(collectionId);
+        const minRequired = collection?.minCount || 1;
+        
+        if (nfts.length < minRequired) {
             return res.json({ 
                 success: false, 
-                error: 'No qualifying NFTs found in wallet' 
+                error: `No ${collection?.name || 'qualifying'} NFTs found. You need at least ${minRequired}.`
             });
         }
 
-        // 4. Store result for bot
+        // 5. Store result for bot
         const result = {
             success: true,
             userId,
             guildId,
             address,
-            nfts: nfts.slice(0, 10), // Limit to 10
+            nfts: nfts.slice(0, 10),
+            collection: collection?.name || 'Any Ordinal',
             verifiedAt: Date.now()
         };
         

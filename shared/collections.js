@@ -1,47 +1,48 @@
 /**
  * Collection Configuration
- * 
- * Define which NFT collections are eligible for verification.
- * In production, store this in a database.
+ * Add your NFT collections here for verification
  */
 
 export const COLLECTIONS = {
-    // Example: Oh No Club
-    'oh-no-club': {
-        name: 'Oh No Club',
-        type: 'ordinals', // or 'stacks'
-        
-        // For Ordinals: inscription IDs or sat ranges
+    // Ordinal Eggs Collection
+    'ordinal-eggs': {
+        name: 'Ordinal Eggs',
+        type: 'ordinals',
+        // Check by inscription number range (Sub10k genesis eggs)
+        inscriptionRange: { min: 0, max: 10000 },
+        // Or specific inscription IDs
         inscriptionIds: [],
-        
-        // For Ordinals: creator address (inscription's parent address)
+        // Creator address if known
         creatorAddress: null,
-        
-        // For Stacks: contract principal
-        contractPrincipal: null,
-        
-        // Required trait filter (optional)
-        requiredTraits: {},
-        
-        // Minimum number of NFTs required
+        // Minimum NFTs required
         minCount: 1,
-        
-        // Metadata
-        icon: '🎨',
-        description: 'Oh No Club generative NFT collection'
+        icon: '🥚',
+        description: 'Ordinal Eggs - Sub10k inscriptions'
+    },
+    
+    // Mother Cluckers
+    'mother-cluckers': {
+        name: 'Mother Cluckers',
+        type: 'ordinals',
+        minCount: 1,
+        icon: '🐔',
+        description: 'Mother Cluckers - 10k recursive pixel art'
+    },
+    
+    // Accept any Ordinal (for testing)
+    'any-ordinal': {
+        name: 'Any Ordinal',
+        type: 'ordinals',
+        minCount: 1,
+        icon: '🔗',
+        description: 'Any Bitcoin Ordinal inscription'
     }
 };
 
-/**
- * Get collection by ID
- */
 export function getCollection(id) {
-    return COLLECTIONS[id] || null;
+    return COLLECTIONS[id] || COLLECTIONS['any-ordinal'];
 }
 
-/**
- * List all configured collections
- */
 export function listCollections() {
     return Object.entries(COLLECTIONS).map(([id, config]) => ({
         id,
@@ -49,43 +50,23 @@ export function listCollections() {
     }));
 }
 
-/**
- * Check if an inscription belongs to a collection
- * This is a simplified check - in production, use more robust methods
- */
-export function isInscriptionInCollection(inscription, collectionId) {
-    const collection = COLLECTIONS[collectionId];
-    if (!collection) return false;
-    
-    // Check by inscription ID list
-    if (collection.inscriptionIds.length > 0) {
-        return collection.inscriptionIds.includes(inscription.id);
-    }
-    
-    // Check by creator address
-    if (collection.creatorAddress) {
-        // This would require fetching inscription details
-        // For now, return true (all inscriptions qualify)
-        return true;
-    }
-    
-    return true;
-}
-
-/**
- * Filter NFTs by collection
- */
 export function filterNFTsByCollection(nfts, collectionId) {
-    const collection = COLLECTIONS[collectionId];
-    if (!collection) return nfts;
+    const collection = getCollection(collectionId);
+    if (!collection || collectionId === 'any-ordinal') return nfts;
     
-    return nfts.filter(nft => isInscriptionInCollection(nft, collectionId));
+    // Filter by inscription range if specified
+    if (collection.inscriptionRange) {
+        return nfts.filter(nft => {
+            const num = parseInt(nft.number);
+            return num >= collection.inscriptionRange.min && 
+                   num <= collection.inscriptionRange.max;
+        });
+    }
+    
+    return nfts;
 }
 
-/**
- * Set active collection for a guild
- * In production, persist to database
- */
+// Guild -> Collection mapping
 const guildCollections = new Map();
 
 export function setGuildCollection(guildId, collectionId) {
@@ -93,5 +74,5 @@ export function setGuildCollection(guildId, collectionId) {
 }
 
 export function getGuildCollection(guildId) {
-    return guildCollections.get(guildId) || null;
+    return guildCollections.get(guildId) || 'any-ordinal';
 }
