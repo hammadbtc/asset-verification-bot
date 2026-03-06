@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import dotenv from 'dotenv';
+import { runReverification, startReverificationScheduler, saveVerifiedUser } from './reverify.js';
 
 dotenv.config();
 
@@ -47,6 +48,10 @@ async function registerCommands() {
                             .setDescription('User to revoke')
                             .setRequired(true)
                     )
+            )
+            .addSubcommand(sub =>
+                sub.setName('reverify')
+                    .setDescription('Run re-verification check on all users')
             )
             .setDefaultMemberPermissions('0') // Admin only
             .toJSON()
@@ -189,6 +194,14 @@ async function grantVerifiedRole(interaction, result) {
         if (VERIFIED_ROLE_ID) {
             await member.roles.add(VERIFIED_ROLE_ID);
         }
+        
+        // Save to re-verification tracking
+        await saveVerifiedUser(
+            result.userId,
+            result.guildId,
+            result.address,
+            result.nfts
+        );
 
         const nftList = result.nfts.slice(0, 5).map(nft => 
             `• ${nft.name || 'NFT #' + nft.number}`
@@ -277,12 +290,33 @@ async function handleAdmin(interaction) {
             ephemeral: true
         });
     }
+    
+    if (subcommand === 'reverify') {
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+        
+        const results = await runReverification(interaction.client);
+        
+        const embed = new EmbedBuilder()
+            .setTitle('🔄 Re-verification Complete')
+            .addFields(
+                { name: 'Checked', value: results.checked.toString(), inline: true },
+                { name: 'Revoked', value: results.revoked.toString(), inline: true },
+                { name: 'Errors', value: results.errors.toString(), inline: true }
+            )
+            .setColor(0x667eea)
+            .setTimestamp();
+        
+        await interaction.editReply({ embeds: [embed] });
+    }
 }
 
 // Event handlers
 client.on('clientReady', () => {
     console.log(`🤖 Bot logged in as ${client.user.tag}`);
     registerCommands();
+    
+    // Start daily re-verification scheduler
+    startReverificationScheduler(client);
 });
 
 client.on('interactionCreate', async (interaction) => {

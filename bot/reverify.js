@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
 import dotenv from 'dotenv';
+import { getGuildCollection, filterNFTsByCollection } from '../shared/collections.js';
 
 dotenv.config();
 
@@ -13,20 +14,10 @@ dotenv.config();
  */
 
 const VERIFIED_ROLE_ID = process.env.VERIFIED_ROLE_ID;
-const REVERIFY_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
 const HIRO_API_BASE = 'https://api.hiro.so';
 
-// Store verified users and their wallets
+// Store verified users and their wallets (in-memory, use DB in production)
 const verifiedUsers = new Map();
-
-/**
- * Load verified users from persistent storage
- * In production, use a database
- */
-export async function loadVerifiedUsers() {
-    // TODO: Load from database
-    return new Map();
-}
 
 /**
  * Save verified user
@@ -43,14 +34,13 @@ export async function saveVerifiedUser(userId, guildId, address, nfts) {
     
     verifiedUsers.set(`${guildId}:${userId}`, data);
     
-    // TODO: Persist to database
     console.log(`💾 Saved verification for user ${userId}`);
 }
 
 /**
  * Check if user still holds required NFTs
  */
-export async function checkUserHoldings(address, collectionId = null) {
+export async function checkUserHoldings(address, guildId) {
     try {
         const response = await fetch(
             `${HIRO_API_BASE}/ordinals/v1/inscriptions?address=${address}&limit=50`
@@ -61,26 +51,28 @@ export async function checkUserHoldings(address, collectionId = null) {
         }
         
         const data = await response.json();
-        const nfts = data.results || [];
+        const allNfts = data.results || [];
         
-        // If collection ID specified, filter by it
-        if (collectionId) {
-            // Note: Hiro API doesn't directly support collection filtering
-            // You may need to cross-reference with your collection data
-            return {
-                hasRequiredNFT: nfts.length > 0, // Customize logic
-                nfts
-            };
-        }
+        // Get collection for this guild
+        const collectionId = getGuildCollection(guildId);
+        
+        // Filter by collection
+        const nfts = filterNFTsByCollection(allNfts.map(nft => ({
+            id: nft.id,
+            number: nft.number,
+            contentType: nft.content_type,
+            name: nft.meta?.name || `Inscription #${nft.number}`
+        })), collectionId);
         
         return {
             hasRequiredNFT: nfts.length > 0,
-            nfts
+            nfts,
+            collectionId
         };
         
     } catch (err) {
         console.error('Failed to check holdings:', err);
-        return { hasRequiredNFT: true, nfts: [] }; // Fail open
+        return { hasRequiredNFT: true, nfts: [], collectionId: null }; // Fail open
     }
 }
 
@@ -101,40 +93,41 @@ export async function runReverification(client) {
             const { userId, guildId, address } = data;
             
             // Check current holdings
-            const { hasRequiredNFT } = await checkUserHoldings(address);
+            const { hasRequiredNFT, collectionId } = await checkUserHoldings(address, guildId);
             
             if (!hasRequiredNFT) {
                 // Remove role
                 const guild = await client.guilds.fetch(guildId);
                 const member = await guild.members.fetch(userId);
                 
-                if (VERIFIED_ROLE_ID) {
+                if (VERIFIED_ROLE_ID && member.roles.cache.has(VERIFIED_ROLE_ID)) {
                     await member.roles.remove(VERIFIED_ROLE_ID);
-                }
-                
-                // Notify user
-                try {
-                    const embed = new EmbedBuilder()
-                        .setTitle('⚠️ Verification Expired')
-                        .setDescription(
-                            'Your verified holder role has been removed because you no longer hold the required NFT.\n\n' +
-                            'If this is a mistake, use `/verify` to re-verify.'
-                        )
-                        .setColor(0xff9800);
                     
-                    await member.send({ embeds: [embed] });
-                } catch (dmErr) {
-                    // DMs disabled, ignore
+                    // Notify user
+                    try {
+                        const embed = new EmbedBuilder()
+                            .setTitle('⚠️ Verification Expired')
+                            .setDescription(
+                                'Your verified holder role has been removed because you no longer hold the required NFT.\n\n' +
+                                'If this is a mistake, use `/verify` to re-verify.'
+                            )
+                            .setColor(0xff9800);
+                        
+                        await member.send({ embeds: [embed] });
+                    } catch (dmErr) {
+                        // DMs disabled, ignore
+                    }
+                    
+                    console.log(`⛔ Revoked verification for ${member.user.tag}`);
+                    results.revoked++;
                 }
                 
                 verifiedUsers.delete(key);
-                results.revoked++;
-                
-                console.log(`⛔ Revoked verification for ${member.user.tag}`);
             } else {
                 // Update last checked
                 data.lastChecked = Date.now();
                 results.checked++;
+                console.log(`✅ ${key} still holds ${collectionId} NFTs`);
             }
             
         } catch (err) {
@@ -151,34 +144,15 @@ export async function runReverification(client) {
  * Start re-verification scheduler
  */
 export function startReverificationScheduler(client) {
-    console.log('📅 Re-verification scheduler started');
+    console.log('📅 Re-verification scheduler started (runs every 24 hours)');
     
     // Run immediately on startup
-    runReverification(client);
+    setTimeout(() => {
+        runReverification(client);
+    }, 60000); // Wait 1 minute after startup
     
-    // Schedule daily runs
+    // Schedule daily runs (24 hours)
     setInterval(() => {
         runReverification(client);
-    }, REVERIFY_INTERVAL);
-}
-
-/**
- * Manual re-verification command handler
- */
-export async function handleReverifyCommand(interaction) {
-    await interaction.deferReply({ ephemeral: true });
-    
-    const results = await runReverification(interaction.client);
-    
-    const embed = new EmbedBuilder()
-        .setTitle('🔄 Re-verification Complete')
-        .addFields(
-            { name: 'Checked', value: results.checked.toString(), inline: true },
-            { name: 'Revoked', value: results.revoked.toString(), inline: true },
-            { name: 'Errors', value: results.errors.toString(), inline: true }
-        )
-        .setColor(0x667eea)
-        .setTimestamp();
-    
-    await interaction.editReply({ embeds: [embed] });
+    }, 24 * 60 * 60 * 1000);
 }
