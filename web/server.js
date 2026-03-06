@@ -14,6 +14,11 @@ app.use(express.json());
 // Serve static files
 app.use(express.static(__dirname));
 
+// Serve index.html for /verify route
+app.get('/verify', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // Active verification sessions
 const sessions = new Map();
 
