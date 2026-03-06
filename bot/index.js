@@ -73,10 +73,11 @@ async function registerCommands() {
  * Handle /verify command
  */
 async function handleVerify(interaction) {
+    // Defer immediately to prevent timeout
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    
     const userId = interaction.user.id;
     const guildId = interaction.guildId;
-
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
         // Create verification session via web API
