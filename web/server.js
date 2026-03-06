@@ -3,7 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { verifySignature, fetchOrdinals } from '../shared/verify.js';
-import { filterNFTsByCollection, getGuildCollection } from '../shared/collections.js';
+import { filterNFTsByCollection, getGuildCollection, getCollection } from '../shared/collections.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
