@@ -1,19 +1,19 @@
 /**
  * Collection Configuration
- * Only Ordinal Eggs and Mother Cluckers collections
+ * Uses exact inscription IDs for 100% accuracy
  */
 
 import { isMotherClucker } from './mother-cluckers.js';
+import { isOrdinalEgg } from './ordinal-eggs.js';
 
 export const COLLECTIONS = {
-    // Ordinal Eggs Collection - Sub10k genesis eggs
+    // Ordinal Eggs Collection - exact inscription IDs
     'ordinal-eggs': {
         name: 'Ordinal Eggs',
         type: 'ordinals',
-        inscriptionRange: { min: 1, max: 10000 },
         minCount: 1,
         icon: '🥚',
-        description: 'Ordinal Eggs Genesis Collection (Sub10k)'
+        description: 'Ordinal Eggs Genesis Collection'
     },
     
     // Mother Cluckers - exact inscription IDs
@@ -64,32 +64,14 @@ function isNFTInCollection(nft, collectionId) {
     const collection = COLLECTIONS[collectionId];
     if (!collection) return false;
 
-    // Check by inscription range (for Sub10k eggs)
-    if (collection.inscriptionRange) {
-        const num = parseInt(nft.number);
-        if (!isNaN(num) && num >= collection.inscriptionRange.min && num <= collection.inscriptionRange.max) {
-            return true;
-        }
+    // For Ordinal Eggs - check exact inscription ID
+    if (collectionId === 'ordinal-eggs') {
+        return isOrdinalEgg(nft.id);
     }
 
-    // For Mother Cluckers - these are HTML recursive inscriptions
+    // For Mother Cluckers - check exact inscription ID
     if (collectionId === 'mother-cluckers') {
-        // Check by exact inscription ID from full collection
-        if (isMotherClucker(nft.id)) {
-            return true;
-        }
-        
-        // Fallback: check by name
-        const name = (nft.name || '').toLowerCase();
-        if (name.includes('clucker')) {
-            return true;
-        }
-        
-        // Fallback: HTML content type (Mother Cluckers are recursive HTML)
-        const contentType = (nft.contentType || '').toLowerCase();
-        if (contentType.includes('text/html')) {
-            return true;
-        }
+        return isMotherClucker(nft.id);
     }
 
     return false;
