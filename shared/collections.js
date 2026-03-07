@@ -72,9 +72,9 @@ function isNFTInCollection(nft, collectionId) {
         }
     }
 
-    // For Mother Cluckers - check exact inscription ID
+    // For Mother Cluckers - these are HTML recursive inscriptions
     if (collectionId === 'mother-cluckers') {
-        // Check by exact inscription ID
+        // Check by exact inscription ID from full collection
         if (isMotherClucker(nft.id)) {
             return true;
         }
@@ -82,6 +82,12 @@ function isNFTInCollection(nft, collectionId) {
         // Fallback: check by name
         const name = (nft.name || '').toLowerCase();
         if (name.includes('clucker')) {
+            return true;
+        }
+        
+        // Fallback: HTML content type (Mother Cluckers are recursive HTML)
+        const contentType = (nft.contentType || '').toLowerCase();
+        if (contentType.includes('text/html')) {
             return true;
         }
     }
