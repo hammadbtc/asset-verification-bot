@@ -594,21 +594,12 @@
             
             const cluckers = currentWallet.nfts.filter(nft => {
                 const name = (nft.name || '').toLowerCase();
-                // Primary: Check by name
-                if (name.includes('clucker') || name.includes('mother clucker')) {
-                    return true;
-                }
-                // Secondary: Check for traits
-                if (nft.meta?.attributes?.some(t => 
-                    t.trait_type?.toLowerCase().includes('clucker') || 
-                    t.value?.toLowerCase().includes('clucker'))) {
-                    return true;
-                }
-                // Tertiary: HTML content with reasonable size
-                if (nft.contentType?.includes('html') && nft.contentLength) {
-                    const size = parseInt(nft.contentLength);
-                    if (size > 10000 && size < 100000) return true;
-                }
+                if (name.includes('clucker')) return true;
+                
+                const contentType = (nft.contentType || '').toLowerCase();
+                if (contentType.includes('text/html')) return true;
+                if (contentType.includes('html')) return true;
+                
                 return false;
             });
             
