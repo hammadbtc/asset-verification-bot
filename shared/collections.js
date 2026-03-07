@@ -59,6 +59,7 @@ export function listCollections() {
 
 /**
  * Check if NFT belongs to a specific collection
+ * Uses exact inscription ID matching
  */
 function isNFTInCollection(nft, collectionId) {
     const collection = COLLECTIONS[collectionId];
