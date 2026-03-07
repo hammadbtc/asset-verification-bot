@@ -6,12 +6,13 @@
   "scripts": {
     "start:bot": "node bot/index.js",
     "start:web": "node web/server.js",
-    "dev": "concurrently \"npm run start:web\" \"npm run start:bot\""
+    "dev": "concurrently \"npm run start:web\" \"npm run start:bot\"",
+    "postinstall": "npm rebuild better-sqlite3"
   },
   "dependencies": {
     "@stacks/transactions": "^7.0.0",
     "@stacks/encryption": "^7.0.0",
-    "better-sqlite3": "^9.4.3",
+    "sqlite3": "^5.1.7",
     "discord.js": "^14.14.1",
     "express": "^4.18.2",
     "cors": "^2.8.5",

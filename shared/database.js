@@ -1,30 +1,34 @@
-import Database from 'better-sqlite3';
+import sqlite3 from 'sqlite3';
+import { open } from 'sqlite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Database file path (in project root)
-const DB_PATH = path.join(__dirname, '..', 'data.db');
+// Database file path
+const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, '..', 'data.db');
 
 let db = null;
 
 /**
  * Initialize database connection and create tables
  */
-export function initDatabase() {
+export async function initDatabase() {
     try {
-        db = new Database(DB_PATH);
+        db = await open({
+            filename: DB_PATH,
+            driver: sqlite3.Database
+        });
         
         // Create tables
-        db.exec(`
+        await db.exec(`
             CREATE TABLE IF NOT EXISTS verified_users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id TEXT NOT NULL,
                 guild_id TEXT NOT NULL,
                 address TEXT NOT NULL,
                 wallet_type TEXT,
-                nfts TEXT, -- JSON array of NFTs
+                nfts TEXT,
                 verified_at INTEGER,
                 last_checked INTEGER,
                 UNIQUE(user_id, guild_id, address)
@@ -50,7 +54,7 @@ export function initDatabase() {
             ON verification_sessions(session_id);
         `);
         
-        console.log('✅ Database initialized');
+        console.log('✅ Database initialized at', DB_PATH);
         return db;
     } catch (err) {
         console.error('❌ Database initialization failed:', err);
@@ -61,17 +65,14 @@ export function initDatabase() {
 /**
  * Save verified user/wallet
  */
-export function saveVerifiedUser(userId, guildId, address, walletType, nfts) {
+export async function saveVerifiedUser(userId, guildId, address, walletType, nfts) {
     if (!db) throw new Error('Database not initialized');
     
-    const stmt = db.prepare(`
-        INSERT OR REPLACE INTO verified_users 
-        (user_id, guild_id, address, wallet_type, nfts, verified_at, last_checked)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    
     const now = Date.now();
-    stmt.run(
+    await db.run(
+        `INSERT OR REPLACE INTO verified_users 
+        (user_id, guild_id, address, wallet_type, nfts, verified_at, last_checked)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
         userId,
         guildId,
         address,
@@ -87,16 +88,16 @@ export function saveVerifiedUser(userId, guildId, address, walletType, nfts) {
 /**
  * Get all wallets for a user in a guild
  */
-export function getUserWallets(userId, guildId) {
+export async function getUserWallets(userId, guildId) {
     if (!db) throw new Error('Database not initialized');
     
-    const stmt = db.prepare(`
-        SELECT address, wallet_type, nfts, verified_at 
+    const rows = await db.all(
+        `SELECT address, wallet_type, nfts, verified_at 
         FROM verified_users 
-        WHERE user_id = ? AND guild_id = ?
-    `);
-    
-    const rows = stmt.all(userId, guildId);
+        WHERE user_id = ? AND guild_id = ?`,
+        userId,
+        guildId
+    );
     
     return rows.map(row => ({
         address: row.address,
@@ -109,15 +110,15 @@ export function getUserWallets(userId, guildId) {
 /**
  * Get all verified users for re-verification
  */
-export function getAllVerifiedUsers() {
+export async function getAllVerifiedUsers() {
     if (!db) throw new Error('Database not initialized');
     
-    const stmt = db.prepare(`
-        SELECT user_id, guild_id, address, wallet_type, nfts, last_checked
-        FROM verified_users
-    `);
+    const rows = await db.all(
+        `SELECT user_id, guild_id, address, wallet_type, nfts, last_checked
+        FROM verified_users`
+    );
     
-    return stmt.all().map(row => ({
+    return rows.map(row => ({
         userId: row.user_id,
         guildId: row.guild_id,
         address: row.address,
@@ -130,82 +131,87 @@ export function getAllVerifiedUsers() {
 /**
  * Remove a user's wallet
  */
-export function removeWallet(userId, guildId, address) {
+export async function removeWallet(userId, guildId, address) {
     if (!db) throw new Error('Database not initialized');
     
-    const stmt = db.prepare(`
-        DELETE FROM verified_users 
-        WHERE user_id = ? AND guild_id = ? AND address = ?
-    `);
-    
-    stmt.run(userId, guildId, address);
+    await db.run(
+        `DELETE FROM verified_users 
+        WHERE user_id = ? AND guild_id = ? AND address = ?`,
+        userId,
+        guildId,
+        address
+    );
     console.log(`🗑️ Removed wallet ${address.slice(0, 10)}... for user ${userId}`);
 }
 
 /**
  * Remove all wallets for a user (when role is revoked)
  */
-export function removeAllUserWallets(userId, guildId) {
+export async function removeAllUserWallets(userId, guildId) {
     if (!db) throw new Error('Database not initialized');
     
-    const stmt = db.prepare(`
-        DELETE FROM verified_users 
-        WHERE user_id = ? AND guild_id = ?
-    `);
-    
-    stmt.run(userId, guildId);
+    await db.run(
+        `DELETE FROM verified_users 
+        WHERE user_id = ? AND guild_id = ?`,
+        userId,
+        guildId
+    );
     console.log(`🗑️ Removed all wallets for user ${userId}`);
 }
 
 /**
  * Update last checked timestamp
  */
-export function updateLastChecked(userId, guildId, address) {
+export async function updateLastChecked(userId, guildId, address) {
     if (!db) throw new Error('Database not initialized');
     
-    const stmt = db.prepare(`
-        UPDATE verified_users 
+    await db.run(
+        `UPDATE verified_users 
         SET last_checked = ?
-        WHERE user_id = ? AND guild_id = ? AND address = ?
-    `);
-    
-    stmt.run(Date.now(), userId, guildId, address);
+        WHERE user_id = ? AND guild_id = ? AND address = ?`,
+        Date.now(),
+        userId,
+        guildId,
+        address
+    );
 }
 
 /**
  * Get verification stats
  */
-export function getStats(guildId) {
+export async function getStats(guildId) {
     if (!db) throw new Error('Database not initialized');
     
-    const totalStmt = db.prepare(`
-        SELECT COUNT(DISTINCT user_id) as count 
+    const totalResult = await db.get(
+        `SELECT COUNT(DISTINCT user_id) as count 
         FROM verified_users 
-        WHERE guild_id = ?
-    `);
+        WHERE guild_id = ?`,
+        guildId
+    );
     
-    const walletStmt = db.prepare(`
-        SELECT COUNT(*) as count 
+    const walletResult = await db.get(
+        `SELECT COUNT(*) as count 
         FROM verified_users 
-        WHERE guild_id = ?
-    `);
+        WHERE guild_id = ?`,
+        guildId
+    );
     
     return {
-        uniqueUsers: totalStmt.get(guildId).count,
-        totalWallets: walletStmt.get(guildId).count
+        uniqueUsers: totalResult?.count || 0,
+        totalWallets: walletResult?.count || 0
     };
 }
 
 /**
  * Close database connection
  */
-export function closeDatabase() {
+export async function closeDatabase() {
     if (db) {
-        db.close();
+        await db.close();
         console.log('📦 Database closed');
     }
 }
 
 // Handle graceful shutdown
-process.on('SIGINT', closeDatabase);
-process.on('SIGTERM', closeDatabase);
+process.on('SIGINT', () => closeDatabase().then(() => process.exit(0)));
+process.on('SIGTERM', () => closeDatabase().then(() => process.exit(0)));

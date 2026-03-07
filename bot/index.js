@@ -5,8 +5,11 @@ import { runReverification, startReverificationScheduler, saveVerifiedUser, getU
 
 dotenv.config();
 
-// Initialize database
-initDatabase();
+// Initialize database (async)
+initDatabase().catch(err => {
+    console.error('Failed to initialize database:', err);
+    process.exit(1);
+});
 
 const client = new Client({
     intents: [
@@ -531,7 +534,7 @@ async function handleManageWallets(interaction) {
     }
 
     // Get user's saved wallets
-    const wallets = getUserWallets(interaction.user.id, interaction.guildId);
+    const wallets = await getUserWallets(interaction.user.id, interaction.guildId);
     
     let walletList = '';
     if (wallets.length > 0) {

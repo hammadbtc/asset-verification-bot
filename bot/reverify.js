@@ -27,14 +27,14 @@ const HIRO_API_BASE = 'https://api.hiro.so';
  * Save verified user (wrapper for database)
  */
 export async function saveVerifiedUser(userId, guildId, address, walletType, nfts) {
-    dbSaveVerifiedUser(userId, guildId, address, walletType, nfts);
+    await dbSaveVerifiedUser(userId, guildId, address, walletType, nfts);
 }
 
 /**
  * Get saved wallets for a user
  */
-export function getUserWallets(userId, guildId) {
-    return dbGetUserWallets(userId, guildId);
+export async function getUserWallets(userId, guildId) {
+    return await dbGetUserWallets(userId, guildId);
 }
 
 /**
@@ -89,7 +89,7 @@ export async function runReverification(client) {
     };
     
     // Get all verified users from database
-    const verifiedUsers = dbGetAllVerifiedUsers();
+    const verifiedUsers = await dbGetAllVerifiedUsers();
     console.log(`📊 Found ${verifiedUsers.length} wallets to check`);
     
     for (const userData of verifiedUsers) {
@@ -109,7 +109,7 @@ export async function runReverification(client) {
                         await member.roles.remove(VERIFIED_ROLE_ID);
                         
                         // Remove from database
-                        dbRemoveAllUserWallets(userId, guildId);
+                        await dbRemoveAllUserWallets(userId, guildId);
                         
                         // Notify user
                         try {
@@ -135,7 +135,7 @@ export async function runReverification(client) {
                 }
             } else {
                 // Update last checked
-                dbUpdateLastChecked(userId, guildId, address);
+                await dbUpdateLastChecked(userId, guildId, address);
                 results.checked++;
                 console.log(`✅ ${userId} still holds ${collectionId} NFTs`);
             }
