@@ -36,7 +36,7 @@
             line-height: 1.6;
         }
 
-        /* Animated Background - Same as Ordinal Eggs */
+        /* Animated Background - Exact match to Ordinal Eggs */
         .bg-animation {
             position: fixed;
             top: 0;
@@ -57,7 +57,7 @@
             background: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.03) 0%, transparent 50%),
                         radial-gradient(circle at 80% 20%, rgba(255,255,255,0.02) 0%, transparent 50%),
                         radial-gradient(circle at 40% 40%, rgba(255,255,255,0.01) 0%, transparent 30%),
-                        radial-gradient(circle at 70% 60%, rgba(147, 197, 253, 0.06) 0%, transparent 40%);
+                        radial-gradient(circle at 70% 60%, rgba(147, 197, 253, 0.05) 0%, transparent 50%);
             animation: bgMove 20s ease-in-out infinite;
         }
 
@@ -301,6 +301,18 @@
             cursor: not-allowed;
         }
 
+        .btn-wallet {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.15);
+        }
+
+        .btn-wallet:hover:not(:disabled) {
+            background: rgba(255,255,255,0.1);
+            border-color: rgba(255,255,255,0.25);
+            transform: translateY(-1px);
+        }
+
         .btn-primary {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
@@ -456,7 +468,7 @@
         </div>
         
         <div class="status-card" id="status-card">
-            <div class="status-icon">👛</div>
+            <div class="status-icon">🔐</div>
             <div class="status-title">Connect Your Wallet</div>
             <div class="status-text">Choose a wallet to verify your NFT ownership</div>
         </div>
@@ -467,11 +479,11 @@
 
         <!-- Wallet buttons shown directly -->
         <div id="wallet-buttons">
-            <button class="btn-primary" id="unisat-btn" onclick="connectSpecificWallet('unisat')">
+            <button class="btn-wallet" id="unisat-btn" onclick="connectSpecificWallet('unisat')">
                 <img src="unisat-logo.png" alt="" style="width: 20px; height: 20px; border-radius: 4px;"> Connect Unisat
             </button>
             
-            <button class="btn-secondary" id="xverse-btn" onclick="connectSpecificWallet('xverse')">
+            <button class="btn-wallet" id="xverse-btn" onclick="connectSpecificWallet('xverse')">
                 <img src="xverse-logo.jpg" alt="" style="width: 20px; height: 20px; border-radius: 4px;"> Connect Xverse
             </button>
         </div>
