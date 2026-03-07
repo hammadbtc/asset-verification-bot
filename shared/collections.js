@@ -64,15 +64,27 @@ function isNFTInCollection(nft, collectionId) {
     // For Mother Cluckers - check by name/content type pattern
     // This is a simplified check - adjust based on your collection traits
     if (collectionId === 'mother-cluckers') {
-        // Mother Cluckers are recursive inscriptions with specific traits
-        // Check if it's a recursive inscription
-        if (nft.contentType?.includes('html') || nft.contentType?.includes('text')) {
+        // Check by name pattern (most reliable)
+        const name = (nft.name || '').toLowerCase();
+        if (name.includes('clucker') || name.includes('mother clucker')) {
             return true;
         }
-        // Or check by name pattern
-        if (nft.name?.toLowerCase().includes('clucker') || 
-            nft.name?.toLowerCase().includes('mother')) {
-            return true;
+        
+        // Check by specific traits in metadata
+        if (nft.meta?.attributes) {
+            const traits = nft.meta.attributes;
+            if (traits.some(t => t.trait_type?.toLowerCase().includes('clucker') || 
+                               t.value?.toLowerCase().includes('clucker'))) {
+                return true;
+            }
+        }
+        
+        // Fallback: Check if HTML content with specific size range
+        if (nft.contentType?.includes('html') && nft.contentLength) {
+            const size = parseInt(nft.contentLength);
+            if (size > 10000 && size < 100000) {
+                return true;
+            }
         }
     }
     

@@ -593,8 +593,23 @@
             });
             
             const cluckers = currentWallet.nfts.filter(nft => {
-                return nft.contentType?.includes('html') || 
-                       nft.name?.toLowerCase().includes('clucker');
+                const name = (nft.name || '').toLowerCase();
+                // Primary: Check by name
+                if (name.includes('clucker') || name.includes('mother clucker')) {
+                    return true;
+                }
+                // Secondary: Check for traits
+                if (nft.meta?.attributes?.some(t => 
+                    t.trait_type?.toLowerCase().includes('clucker') || 
+                    t.value?.toLowerCase().includes('clucker'))) {
+                    return true;
+                }
+                // Tertiary: HTML content with reasonable size
+                if (nft.contentType?.includes('html') && nft.contentLength) {
+                    const size = parseInt(nft.contentLength);
+                    if (size > 10000 && size < 100000) return true;
+                }
+                return false;
             });
             
             const totalFound = eggs.length + cluckers.length;
