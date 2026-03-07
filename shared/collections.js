@@ -3,6 +3,8 @@
  * Only Ordinal Eggs and Mother Cluckers collections
  */
 
+import { isMotherClucker } from './mother-cluckers.js';
+
 export const COLLECTIONS = {
     // Ordinal Eggs Collection - Sub10k genesis eggs
     'ordinal-eggs': {
@@ -14,7 +16,7 @@ export const COLLECTIONS = {
         description: 'Ordinal Eggs Genesis Collection (Sub10k)'
     },
     
-    // Mother Cluckers - 10k recursive pixel art
+    // Mother Cluckers - exact inscription IDs
     'mother-cluckers': {
         name: 'Mother Cluckers',
         type: 'ordinals',
@@ -45,7 +47,7 @@ export const COLLECTIONS = {
 };
 
 export function getCollection(id) {
-    return COLLECTIONS[id] || COLLECTIONS['eggs-and-cluckers'];
+    return COLLECTIONS[id] || COLLECTIONS['all-eggs'];
 }
 
 export function listCollections() {
@@ -61,35 +63,29 @@ export function listCollections() {
 function isNFTInCollection(nft, collectionId) {
     const collection = COLLECTIONS[collectionId];
     if (!collection) return false;
-    
+
     // Check by inscription range (for Sub10k eggs)
     if (collection.inscriptionRange) {
         const num = parseInt(nft.number);
-        if (num >= collection.inscriptionRange.min && 
-            num <= collection.inscriptionRange.max) {
+        if (!isNaN(num) && num >= collection.inscriptionRange.min && num <= collection.inscriptionRange.max) {
             return true;
         }
     }
-    
-    // For Mother Cluckers - these are HTML recursive inscriptions
+
+    // For Mother Cluckers - check exact inscription ID
     if (collectionId === 'mother-cluckers') {
-        // Check by name pattern
+        // Check by exact inscription ID
+        if (isMotherClucker(nft.id)) {
+            return true;
+        }
+        
+        // Fallback: check by name
         const name = (nft.name || '').toLowerCase();
         if (name.includes('clucker')) {
             return true;
         }
-        
-        // Mother Cluckers are HTML recursive inscriptions
-        // They have content_type like "text/html;charset=utf-8"
-        const contentType = (nft.contentType || '').toLowerCase();
-        if (contentType.includes('text/html')) {
-            return true;
-        }
-        if (contentType.includes('html')) {
-            return true;
-        }
     }
-    
+
     return false;
 }
 
