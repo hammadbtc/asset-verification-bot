@@ -1,6 +1,13 @@
-import { Client, GatewayIntentBits, EmbedBuilder } from 'discord.js';
+import { EmbedBuilder } from 'discord.js';
 import dotenv from 'dotenv';
 import { getGuildCollection, filterNFTsByCollection } from '../shared/collections.js';
+import {
+    saveVerifiedUser as dbSaveVerifiedUser,
+    getUserWallets as dbGetUserWallets,
+    getAllVerifiedUsers as dbGetAllVerifiedUsers,
+    removeAllUserWallets as dbRemoveAllUserWallets,
+    updateLastChecked as dbUpdateLastChecked
+} from '../shared/database.js';
 
 dotenv.config();
 
@@ -16,40 +23,18 @@ dotenv.config();
 const VERIFIED_ROLE_ID = process.env.VERIFIED_ROLE_ID;
 const HIRO_API_BASE = 'https://api.hiro.so';
 
-// Store verified users and their wallets (in-memory, use DB in production)
-const verifiedUsers = new Map();
-
 /**
- * Save verified user
+ * Save verified user (wrapper for database)
  */
-export async function saveVerifiedUser(userId, guildId, address, nfts) {
-    const data = {
-        userId,
-        guildId,
-        address,
-        nfts,
-        verifiedAt: Date.now(),
-        lastChecked: Date.now()
-    };
-    
-    verifiedUsers.set(`${guildId}:${userId}`, data);
-    
-    console.log(`💾 Saved verification for user ${userId}`);
+export async function saveVerifiedUser(userId, guildId, address, walletType, nfts) {
+    dbSaveVerifiedUser(userId, guildId, address, walletType, nfts);
 }
 
 /**
  * Get saved wallets for a user
  */
 export function getUserWallets(userId, guildId) {
-    const key = `${guildId}:${userId}`;
-    const data = verifiedUsers.get(key);
-    if (!data) return [];
-    
-    return [{
-        address: data.address,
-        nfts: data.nfts,
-        verifiedAt: data.verifiedAt
-    }];
+    return dbGetUserWallets(userId, guildId);
 }
 
 /**
@@ -103,46 +88,56 @@ export async function runReverification(client) {
         errors: 0
     };
     
-    for (const [key, data] of verifiedUsers) {
+    // Get all verified users from database
+    const verifiedUsers = dbGetAllVerifiedUsers();
+    console.log(`📊 Found ${verifiedUsers.length} wallets to check`);
+    
+    for (const userData of verifiedUsers) {
         try {
-            const { userId, guildId, address } = data;
+            const { userId, guildId, address, nfts } = userData;
             
             // Check current holdings
             const { hasRequiredNFT, collectionId } = await checkUserHoldings(address, guildId);
             
             if (!hasRequiredNFT) {
                 // Remove role
-                const guild = await client.guilds.fetch(guildId);
-                const member = await guild.members.fetch(userId);
-                
-                if (VERIFIED_ROLE_ID && member.roles.cache.has(VERIFIED_ROLE_ID)) {
-                    await member.roles.remove(VERIFIED_ROLE_ID);
+                try {
+                    const guild = await client.guilds.fetch(guildId);
+                    const member = await guild.members.fetch(userId);
                     
-                    // Notify user
-                    try {
-                        const embed = new EmbedBuilder()
-                            .setTitle('⚠️ Verification Expired')
-                            .setDescription(
-                                'Your verified holder role has been removed because you no longer hold the required NFT.\n\n' +
-                                'If this is a mistake, use `/verify` to re-verify.'
-                            )
-                            .setColor(0xff9800);
+                    if (VERIFIED_ROLE_ID && member.roles.cache.has(VERIFIED_ROLE_ID)) {
+                        await member.roles.remove(VERIFIED_ROLE_ID);
                         
-                        await member.send({ embeds: [embed] });
-                    } catch (dmErr) {
-                        // DMs disabled, ignore
+                        // Remove from database
+                        dbRemoveAllUserWallets(userId, guildId);
+                        
+                        // Notify user
+                        try {
+                            const embed = new EmbedBuilder()
+                                .setTitle('⚠️ Verification Expired')
+                                .setDescription(
+                                    'Your verified holder role has been removed because you no longer hold the required NFT.\n\n' +
+                                    'If this is a mistake, use `/verify` to re-verify.'
+                                )
+                                .setColor(0xff9800);
+                            
+                            await member.send({ embeds: [embed] });
+                        } catch (dmErr) {
+                            // DMs disabled, ignore
+                        }
+                        
+                        console.log(`⛔ Revoked verification for ${member.user.tag}`);
+                        results.revoked++;
                     }
-                    
-                    console.log(`⛔ Revoked verification for ${member.user.tag}`);
-                    results.revoked++;
+                } catch (guildErr) {
+                    console.error(`Failed to process ${userId}:`, guildErr);
+                    results.errors++;
                 }
-                
-                verifiedUsers.delete(key);
             } else {
                 // Update last checked
-                data.lastChecked = Date.now();
+                dbUpdateLastChecked(userId, guildId, address);
                 results.checked++;
-                console.log(`✅ ${key} still holds ${collectionId} NFTs`);
+                console.log(`✅ ${userId} still holds ${collectionId} NFTs`);
             }
             
         } catch (err) {

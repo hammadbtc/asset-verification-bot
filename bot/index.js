@@ -1,8 +1,12 @@
 import { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, ButtonBuilder, ActionRowBuilder, ButtonStyle, MessageFlags } from 'discord.js';
 import dotenv from 'dotenv';
+import { initDatabase } from '../shared/database.js';
 import { runReverification, startReverificationScheduler, saveVerifiedUser, getUserWallets } from './reverify.js';
 
 dotenv.config();
+
+// Initialize database
+initDatabase();
 
 const client = new Client({
     intents: [
@@ -207,6 +211,7 @@ async function grantVerifiedRole(interaction, result) {
                 result.userId,
                 result.guildId,
                 wallet.address,
+                wallet.type,
                 result.nfts || []
             );
         }
