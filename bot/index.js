@@ -485,6 +485,13 @@ async function handleVerifyButton(interaction) {
         const { sessionId, url } = await response.json();
         const verifyUrl = `${WEB_BASE_URL}${url}`;
 
+        // Store for polling
+        activeVerifications.set(sessionId, {
+            userId,
+            guildId,
+            startedAt: Date.now()
+        });
+
         const embed = new EmbedBuilder()
             .setTitle('🔐 Start Verification')
             .setDescription(
@@ -508,6 +515,9 @@ async function handleVerifyButton(interaction) {
             components: [row],
             ephemeral: true
         });
+
+        // Start polling for result
+        pollVerification(sessionId, interaction);
 
     } catch (err) {
         console.error('Verify button error:', err);
