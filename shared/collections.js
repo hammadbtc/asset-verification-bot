@@ -31,6 +31,16 @@ export const COLLECTIONS = {
         minCount: 1,
         icon: '🥚🐔',
         description: 'Hold either Ordinal Eggs or Mother Cluckers'
+    },
+    
+    // Allow both collections combined
+    'all-eggs': {
+        name: 'All Ordinal Eggs Collections',
+        type: 'ordinals',
+        collections: ['ordinal-eggs', 'mother-cluckers'],
+        minCount: 1,
+        icon: '🥚',
+        description: 'Any Ordinal Eggs collection NFT'
     }
 };
 
@@ -106,6 +116,6 @@ export function setGuildCollection(guildId, collectionId) {
 }
 
 export function getGuildCollection(guildId) {
-    // Default to eggs-and-cluckers (both collections)
-    return guildCollections.get(guildId) || 'eggs-and-cluckers';
+    // Default to accepting both collections
+    return guildCollections.get(guildId) || 'all-eggs';
 }
